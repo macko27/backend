@@ -207,11 +207,11 @@ namespace AGILE2024_BE
                     await _roleManager.CreateAsync(new IdentityRole(RolesDef.Veduci));
                 }
 
-                ExtendedIdentityUser? admin = await _userManager.FindByEmailAsync("patrik@email.com");
+                ExtendedIdentityUser? admin = await _userManager.FindByEmailAsync("matej@email.com");
                 if (admin == null)
                 {
-                    string[] userNames = { "patrik", "brano", "lukas", "michal", "alexandra", "sara" };
-                    string[] lastNames = { "balvan", "brano", "kišša", "ondrejka", "vojtasova", "papšova" };
+                    string[] userNames = { "matej", "katarina", "simona" };
+                    string[] lastNames = { "macko", "poliakova", "tothova" };
 
                     for (int i = 0; i < userNames.Length; i++)
                     {

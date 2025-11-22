@@ -55,14 +55,16 @@ namespace AGILE2024_BE.API
 
             webAppBuilder.Services.AddCors(options =>
             {
-                options.AddPolicy("AllowAllOrigins", builder =>
+                options.AddPolicy("FrontendPolicy", builder =>
                 {
-                    builder.AllowAnyOrigin()
+                    builder.WithOrigins("https://talent-hub-frontend-c5b5eucsbwd5g6gg.polandcentral-01.azurewebsites.net",
+                            "http://localhost:3000")
                            .AllowAnyMethod()
                            .AllowAnyHeader();
+                    // .AllowCredentials(); // nepouûÌvaj s AllowAnyOrigin
                 });
-            }
-            );
+            });
+
 
             webAppBuilder.Services.AddSignalR();
 
@@ -137,22 +139,21 @@ namespace AGILE2024_BE.API
 
             webApp.UseHttpsRedirection();
 
-            webApp.UseCors(builder => builder
-                .AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader());
+            webApp.UseRouting(); // musÌme maù routing pred UseCors
 
-            webApp.UseDefaultFiles();
-            webApp.UseStaticFiles();
-            webApp.UseRouting();
+            webApp.UseCors("FrontendPolicy"); // spr·vne miesto
 
             webApp.UseAuthentication();
             webApp.UseAuthorization();
 
-            webApp.MapFallbackToFile("index.html");
-            webApp.MapControllers();
+            webApp.UseDefaultFiles();
+            webApp.UseStaticFiles();
 
+            webApp.MapControllers();
             webApp.MapHub<NotificationHub>("/notificationHub");
+
+            // SPA fallback
+            webApp.MapFallbackToFile("index.html");
         }
     }
 }

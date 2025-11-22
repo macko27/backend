@@ -3,6 +3,7 @@ using AGILE2024_BE.Models.Entity.Adaptation;
 using AGILE2024_BE.Models.Entity.Courses;
 using AGILE2024_BE.Models.Entity.SuccessionPlan;
 using AGILE2024_BE.Models.Identity;
+using AGILE2024_BE.Models.Survey;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,11 @@ namespace AGILE2024_BE.Data
         public DbSet<AdaptationDoc> AdaptationDocs { get; set; }
         public DbSet<AdaptationState> AdaptationStates { get; set; }
         public DbSet<AdaptationTask> AdaptationTasks { get; set; }
+
+        //surveys
+        public DbSet<Survey> Surveys { get; set; }
+        public DbSet<SurveyAnswer> SurveyAnswers { get; set; }
+        public DbSet<SurveyOption> SurveyOptions { get; set; }
         #endregion
     }
 }

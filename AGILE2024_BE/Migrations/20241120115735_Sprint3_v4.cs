@@ -10,9 +10,9 @@ namespace AGILE2024_BE.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "SuperiorId",
-                table: "Departments");
+            //migrationBuilder.DropColumn(
+                //name: "SuperiorId",
+                //table: "Departments");
 
             migrationBuilder.AlterColumn<string>(
                 name: "UserId",

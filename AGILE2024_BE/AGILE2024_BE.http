@@ -1,4 +1,5 @@
-@AGILE2024_BE_HostAddress = http://localhost:5091
+//@AGILE2024_BE_HostAddress = http://localhost:5091
+@AGILE2024_BE_HostAddress = https://talent-hub-backend-anf9c3d6e9cdbgg2.polandcentral-01.azurewebsites.net/
 
 GET {{AGILE2024_BE_HostAddress}}/weatherforecast/
 Accept: application/json
