@@ -1,23 +1,12 @@
-﻿using AGILE2024_BE.Models.Requests;
-using AGILE2024_BE.Models.Response;
-using AGILE2024_BE.Helpers;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using AGILE2024_BE.Data;
 using AGILE2024_BE.Models.Identity;
 using Microsoft.EntityFrameworkCore;
-using AGILE2024_BE.Models;
-using Azure.Core;
-using AGILE2024_BE.Models.Requests.GoalRequests;
-using AGILE2024_BE.Services;
-using Microsoft.AspNetCore.SignalR;
-using AGILE2024_BE.Models.Entity.SuccessionPlan;
-using AGILE2024_BE.Models.Entity.Adaptation;
 using AGILE2024_BE.Models.Enums;
 using AGILE2024_BE.Models.Survey;
-using System.ComponentModel.DataAnnotations.Schema;
+using AGILE2024_BE.Models;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -39,8 +28,11 @@ namespace AGILE2024_BE.Controllers
             this.dbContext = db;
         }
 
-
+        //**********************************************************************************
+        // Vytvorenie ankety
+        //**********************************************************************************
         [HttpPost("Create")]
+        [Authorize(Roles = RolesDef.Veduci)]
         public async Task<IActionResult> CreateSurvey([FromBody] SurveyRequest data)
         {
 
@@ -82,7 +74,45 @@ namespace AGILE2024_BE.Controllers
             return Ok(new { surveyId = survey.Id });
         }
 
-        
+
+        //**********************************************************************************
+        // Ziskanie ankiet pre daneho pouzivatela
+        //**********************************************************************************
+        [HttpGet("GetByEmployee/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> GetSurveysByEmployee(Guid employeeId)
+        {
+            var employeeCard = await dbContext.EmployeeCards
+                .Include(ec => ec.User)
+                .Include(ec => ec.Department)
+                .FirstOrDefaultAsync(ec => ec.Id == employeeId);
+
+            if (employeeCard == null)
+                return BadRequest("EmployeeCard pre daného používateľa neexistuje.");
+
+            var departmentId = employeeCard.Department?.Id;
+
+            var surveys = await dbContext.Surveys
+                .Include(s => s.createdBy)
+                .ThenInclude(ec => ec.Department)
+                .Include(s => s.Options)
+                .Where(s => s.createdBy.Department.Id == departmentId)
+                .ToListAsync();
+
+            var surveyResponses = surveys.Select(s => new
+            {
+                s.Id,
+                s.name,
+                s.question,
+                s.info,
+                status = s.status.ToString(),
+                createdById = s.createdBy.Id,
+                departmentId = s.createdBy.Department.Id,
+                options = s.Options.Select(o => new { id = o.Id, answer = o.answer })
+            });
+
+            return Ok(surveyResponses);
+        }
     }
 
     public class SurveyRequest
