@@ -7,8 +7,8 @@ namespace AGILE2024_BE.Models.Survey
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public Guid Id { get; set; }
 
-        [ForeignKey(nameof(Survey) + "Id")]
-        public required Survey survey { get; set; }
-        public required string answer { get; set; }
+        public string Answer { get; set; } = string.Empty;
+        [ForeignKey(nameof(Question) + "Id")]
+        public SurveyQuestion Question { get; set; } = null!;
     }
 }

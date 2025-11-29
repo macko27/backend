@@ -44,25 +44,36 @@ namespace AGILE2024_BE.Controllers
                 return BadRequest("Vytvárajúci zamestnanec neexistuje.");
             }
 
-            if (data.Options.Count == 0 || data.Options.Count > 6)
+            if (data.questions.Count == 0)
             {
-                return BadRequest("Anketa musí mať aspoň 1 a maximálne 6 možností.");
+                return BadRequest("Anketa musí mať aspoň 1 otázku");
             }
 
             var survey = new Survey
             {
                 Id = Guid.NewGuid(),
                 name = data.name,
-                question = data.question,
                 info = data.info,
                 status = data.status,
+                SurveyType = data.surveyType,
                 createdBy = createdBy,
+                start = data.start,
                 end = data.end,
-                Options = data.Options.Select(o => new SurveyOption
+                Recipients = data.recipients.Select(r => new Recipient
                 {
                     Id = Guid.NewGuid(),
-                    survey = null,
-                    answer = o.Answer
+                    EmployeeCardId = r.id,
+                    Type = r.type,
+                }).ToList(),
+                Questions = data.questions.Select(q => new SurveyQuestion
+                {
+                    Id = Guid.NewGuid(),
+                    question = q.question,
+                    Options = q.options.Select(o => new SurveyOption
+                    {
+                        Id = Guid.NewGuid(),
+                        Answer = o.answer
+                    }).ToList()
                 }).ToList()
             };
 
@@ -95,7 +106,7 @@ namespace AGILE2024_BE.Controllers
             var surveys = await dbContext.Surveys
                 .Include(s => s.createdBy)
                 .ThenInclude(ec => ec.Department)
-                .Include(s => s.Options)
+                .Include(s => s.Questions)
                 .Where(s => s.createdBy.Department.Id == departmentId)
                 .ToListAsync();
 
@@ -103,33 +114,104 @@ namespace AGILE2024_BE.Controllers
             {
                 s.Id,
                 s.name,
-                s.question,
                 s.info,
                 status = s.status.ToString(),
                 createdById = s.createdBy.Id,
                 departmentId = s.createdBy.Department.Id,
-                options = s.Options.Select(o => new { id = o.Id, answer = o.answer })
+                questions = s.Questions.Select(o => new { id = o.Id, answer = o.question })
             });
 
             return Ok(surveyResponses);
         }
+
+
+        //**********************************************************************************
+        // Vyhľadávanie zamestnancov / oddelení pre výber príjemcov
+        //**********************************************************************************
+        [HttpGet("SearchRecipients")]
+        [Authorize(Roles = RolesDef.Veduci)]
+        public async Task<IActionResult> SearchRecipients([FromQuery] string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Ok(new List<object>());
+
+            query = query.Trim().ToLower();
+
+            // 1. Zamestnanci (meno a priezvisko obsahujú query)
+            var employees = await dbContext.EmployeeCards
+                .Include(e => e.User)
+                .Where(e =>
+                    (e.User.Name + " " + e.User.Surname).ToLower().Contains(query)
+                )
+                .Select(e => new
+                {
+                    id = e.Id,
+                    name = e.User.Name + " " + e.User.Surname,
+                    type = "employee"
+                })
+                .Take(20)
+                .ToListAsync();
+
+
+            // 2. Oddelenia (názov oddelenia obsahuje query)
+            var departments = await dbContext.Departments
+                .Include(d => d.EmployeeCards)
+                .Where(d => d.Name.ToLower().Contains(query))
+                .Select(d => new
+                {
+                    id = d.Id,
+                    name = d.Name,
+                    type = "department",
+                    count = d.EmployeeCards.Count
+                })
+                .Take(20)
+                .ToListAsync();
+
+            // 3. Spojenie výsledkov
+            var result = employees.Cast<object>()
+                .Concat(departments)
+                .ToList();
+
+            return Ok(result);
+        }
+
     }
 
     public class SurveyRequest
     {
         public string name { get; set; }
-        public string question { get; set; }
         public string? info { get; set; }
         public EnumSurveyState status { get; set; }
 
         public Guid createdById { get; set; }
+        public DateTime start { get; set; } = DateTime.Now;
         public DateTime end { get; set; } = DateTime.Now;
-        public ICollection<SurveyOptionRequest> Options { get; set; } = new List<SurveyOptionRequest>();
+        public string surveyType { get; set; } = "anonymous";
+        public ICollection<RecipientRequest>? recipients { get; set; } = new List<RecipientRequest>();
+
+        public ICollection<QuestionRequest> questions { get; set; } = new List<QuestionRequest>();
+    }
+
+    public class RecipientRequest
+    {
+        public Guid id { get; set; }
+        public string? name { get; set; }
+        public string? type { get; set; }
+       
+    }
+
+    public class QuestionRequest
+    {
+        public string? question { get; set; }
+        public ICollection<OptionRequest> options { get; set; } = new List<OptionRequest>();
+
     }
 
 
-    public class SurveyOptionRequest
+    public class OptionRequest
     {
-        public string Answer { get; set; }
+        public string answer { get; set; } = "";
     }
 }
+
+
