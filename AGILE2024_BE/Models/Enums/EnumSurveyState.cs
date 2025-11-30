@@ -4,6 +4,7 @@
     {
         Aktívna,
         Uzavretá,
-        Zrušená
+        Zrušená,
+        Neaktívna
     }
 }
