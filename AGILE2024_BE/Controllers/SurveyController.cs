@@ -85,7 +85,8 @@ namespace AGILE2024_BE.Controllers
                         Id = Guid.NewGuid(),
                         Answer = o.answer
                     }).ToList()
-                }).ToList()
+                }).ToList(),
+                anoPlatny = 1
             };
 
            
@@ -99,6 +100,7 @@ namespace AGILE2024_BE.Controllers
 
         //**********************************************************************************
         // Ziskanie ankiet pre daneho pouzivatela
+        // Zoznam ankiet
         //**********************************************************************************
         [HttpGet("GetByEmployee/{employeeId}")]
         [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
@@ -119,6 +121,8 @@ namespace AGILE2024_BE.Controllers
                 .Include(s => s.Recipients)
                 .Include(s => s.Questions)
                 .Where(s =>
+                    s.anoPlatny == 1 &&
+                    (s.status == EnumSurveyState.Aktívna || s.status == EnumSurveyState.Uzavretá) &&
                     s.createdBy.Id != employeeCard.Id &&
                     (
                         s.Recipients.Any(r => r.Type == "employee" && r.EmployeeCardId == employeeCard.Id)
@@ -146,6 +150,7 @@ namespace AGILE2024_BE.Controllers
 
         //**********************************************************************************
         // Vratenie ankiet ktore vytvoril dany veduci podla id veduceho
+        // Moje ankety
         //**********************************************************************************
         [HttpGet("GetMySurveys/{employeeId}")]
         [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
@@ -160,7 +165,7 @@ namespace AGILE2024_BE.Controllers
             var surveys = await dbContext.Surveys
                 .Include(s => s.Recipients)
                 .Include(s => s.Questions)
-                .Where(s => s.createdBy.Id == employee.Id)
+                .Where(s => s.createdBy.Id == employee.Id && s.anoPlatny == 1)
                 .ToListAsync();
 
             var response = surveys.Select(s => new
@@ -245,6 +250,132 @@ namespace AGILE2024_BE.Controllers
                 .ToList();
 
             return Ok(result);
+        }
+
+
+
+        //**********************************************************************************
+        // Detail ankety podľa ID
+        //**********************************************************************************
+        [HttpGet("GetDetail/{surveyId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> GetSurveyDetail(Guid surveyId)
+        {
+            var survey = await dbContext.Surveys
+                .Include(s => s.createdBy)
+                .Include(s => s.Recipients)
+                .Include(s => s.Questions)
+                    .ThenInclude(q => q.Options)
+                .FirstOrDefaultAsync(s => s.Id == surveyId && s.anoPlatny == 1);
+
+            if (survey == null)
+                return NotFound("Anketa neexistuje.");
+
+            var totalRecipients = await CalculateTotalRecipientsAsync(survey);
+
+            // neskôr doplníš keď budeš mať votes tabuľku
+            var totalVotes = 0;
+
+            var response = new
+            {
+                id = survey.Id,
+                name = survey.name,
+                info = survey.info,
+                type = survey.SurveyType,
+                status = survey.status.ToString(),
+                start = survey.start,
+                end = survey.end,
+                createdBy = survey.createdBy.Id,
+                totalRecipients = totalRecipients,
+                totalVotes = totalVotes,
+                questions = survey.Questions.Select(q => new
+                {
+                    id = q.Id,
+                    question = q.question,
+                    options = q.Options.Select(o => new
+                    {
+                        id = o.Id,
+                        answer = o.Answer
+                    })
+                })
+            };
+
+            return Ok(response);
+        }
+
+
+        private async Task<int> CalculateTotalRecipientsAsync(Survey survey)
+        {
+            int total = 0;
+
+            foreach (var r in survey.Recipients)
+            {
+                switch (r.Type)
+                {
+                    case "employee":
+                        total += 1;
+                        break;
+
+                    case "department":
+                        var departmentId = r.EmployeeCardId;
+
+                        var deptCount = await dbContext.EmployeeCards
+                            .Where(ec => ec.Department.Id == departmentId)
+                            .CountAsync();
+
+                        total += 1;
+
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+
+            return total;
+        }
+
+
+        //**********************************************************************************
+        // Detail ankety podľa ID
+        //**********************************************************************************
+        [HttpDelete("{surveyId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> DeleteSurvey(Guid surveyId)
+        {
+            var survey = await dbContext.Surveys
+                .Include(s => s.createdBy) // aby sme mali createdBy.Id
+                .FirstOrDefaultAsync(s => s.Id == surveyId);
+
+            if (survey == null)
+                return NotFound(new { message = "Anketa neexistuje." });
+
+            var userId = this.userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var employeeCard = await dbContext.EmployeeCards
+                .FirstOrDefaultAsync(ec => ec.User.Id == userId);
+
+            if (employeeCard == null)
+                return Unauthorized();
+
+            // Kontrola, či som autor ankety
+            if (survey.createdBy.Id != employeeCard.Id)
+                return Forbid("Nemôžete vymazať anketu, ktorú ste nevytvorili.");
+
+            // Soft delete: nastav AnoPlatny = 0
+            survey.anoPlatny = 0;
+
+            try
+            {
+                await dbContext.SaveChangesAsync();
+                return Ok(new { message = "Anketa bola úspešne vymazaná (soft delete)." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Chyba pri vymazávaní ankety.", error = ex.Message });
+            }
         }
 
     }

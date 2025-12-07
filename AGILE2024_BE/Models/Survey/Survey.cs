@@ -18,5 +18,6 @@ namespace AGILE2024_BE.Models.Survey
         public required DateTime end { get; set; } = DateTime.Now;
         public ICollection<Recipient>? Recipients { get; set; } = new List<Recipient>();
         public ICollection<SurveyQuestion> Questions { get; set; } = new List<SurveyQuestion>();
+        public int anoPlatny { get; set; }
     }
 }
