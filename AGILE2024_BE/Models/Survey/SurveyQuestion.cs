@@ -12,5 +12,6 @@ namespace AGILE2024_BE.Models.Survey
         public Survey Survey { get; set; } = null!;
 
         public ICollection<SurveyOption> Options { get; set; } = new List<SurveyOption>();
+        public String answerType { get; set; }
     }
 }

@@ -4,6 +4,7 @@ using AGILE2024_BE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AGILE2024_BE.Migrations
 {
     [DbContext(typeof(AgileDBContext))]
-    partial class AgileDBContextModelSnapshot : ModelSnapshot
+    [Migration("20251208100255_stavOtazky")]
+    partial class stavOtazky
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1089,17 +1092,16 @@ namespace AGILE2024_BE.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<Guid>("EmployeeCardId")
+                    b.Property<Guid>("SurveyId")
                         .HasColumnType("char(36)");
 
-                    b.Property<Guid>("SurveyQuestionId")
-                        .HasColumnType("char(36)");
+                    b.Property<string>("answer")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmployeeCardId");
-
-                    b.HasIndex("SurveyQuestionId");
+                    b.HasIndex("SurveyId");
 
                     b.ToTable("SurveyAnswers");
                 });
@@ -1721,21 +1723,13 @@ namespace AGILE2024_BE.Migrations
 
             modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyAnswer", b =>
                 {
-                    b.HasOne("AGILE2024_BE.Models.EmployeeCard", "user")
+                    b.HasOne("AGILE2024_BE.Models.Survey.Survey", "survey")
                         .WithMany()
-                        .HasForeignKey("EmployeeCardId")
+                        .HasForeignKey("SurveyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AGILE2024_BE.Models.Survey.SurveyQuestion", "question")
-                        .WithMany()
-                        .HasForeignKey("SurveyQuestionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("question");
-
-                    b.Navigation("user");
+                    b.Navigation("survey");
                 });
 
             modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyOption", b =>

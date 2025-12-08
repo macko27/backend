@@ -85,7 +85,8 @@ namespace AGILE2024_BE.Controllers
                     {
                         Id = Guid.NewGuid(),
                         Answer = o.answer
-                    }).ToList()
+                    }).ToList(),
+                    answerType = q.answerType
                 }).ToList(),
                 anoPlatny = 1
             };
@@ -438,6 +439,7 @@ namespace AGILE2024_BE.Controllers
     {
         public string? question { get; set; }
         public ICollection<OptionRequest> options { get; set; } = new List<OptionRequest>();
+        public String answerType { get; set; }
 
     }
 
