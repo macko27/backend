@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using AGILE2024_BE.Models.Enums;
 using AGILE2024_BE.Models.Survey;
 using AGILE2024_BE.Models;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -323,7 +324,7 @@ namespace AGILE2024_BE.Controllers
                             .Where(ec => ec.Department.Id == departmentId)
                             .CountAsync();
 
-                        total += 1;
+                        total += deptCount;
 
                         break;
 
@@ -377,6 +378,36 @@ namespace AGILE2024_BE.Controllers
                 return StatusCode(500, new { message = "Chyba pri vymazávaní ankety.", error = ex.Message });
             }
         }
+
+
+        //**********************************************************************************
+        // Získanie názvu oddelenia pre vedúceho / zamestnanca
+        //**********************************************************************************
+        [HttpGet("GetMyDepartment/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci)]
+        public async Task<IActionResult> GetMyDepartment(Guid employeeId)
+        {
+            // Načítanie EmployeeCard vrátane Department
+            var employee = await dbContext.EmployeeCards
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(e => e.User.Id == employeeId.ToString());
+
+
+            if (employee == null)
+                return BadRequest("EmployeeCard neexistuje.");
+
+            if (employee.Department == null)
+                return BadRequest("Employee nemá priradené žiadne oddelenie.");
+
+            // Vrátenie názvu oddelenia
+            return Ok(new
+            {
+                Id = employee.Department.Id,
+                departmentName = employee.Department.Name,
+                type = "department",
+            });
+        }
+
 
     }
 
