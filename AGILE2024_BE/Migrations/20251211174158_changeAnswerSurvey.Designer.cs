@@ -4,6 +4,7 @@ using AGILE2024_BE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AGILE2024_BE.Migrations
 {
     [DbContext(typeof(AgileDBContext))]
-    partial class AgileDBContextModelSnapshot : ModelSnapshot
+    [Migration("20251211174158_changeAnswerSurvey")]
+    partial class changeAnswerSurvey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1122,30 +1125,16 @@ namespace AGILE2024_BE.Migrations
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("SurveyAnswerId")
+                        .HasColumnType("char(36)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("QuestionId");
 
-                    b.ToTable("SurveyOptions");
-                });
-
-            modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyOptionAnswer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("OptionId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("SurveyAnswerId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
                     b.HasIndex("SurveyAnswerId");
 
-                    b.ToTable("SurveyOptionAnswer");
+                    b.ToTable("SurveyOptions");
                 });
 
             modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyQuestion", b =>
@@ -1773,18 +1762,11 @@ namespace AGILE2024_BE.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Question");
-                });
-
-            modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyOptionAnswer", b =>
-                {
-                    b.HasOne("AGILE2024_BE.Models.Survey.SurveyAnswer", "SurveyAnswer")
+                    b.HasOne("AGILE2024_BE.Models.Survey.SurveyAnswer", null)
                         .WithMany("selectedOptions")
-                        .HasForeignKey("SurveyAnswerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("SurveyAnswerId");
 
-                    b.Navigation("SurveyAnswer");
+                    b.Navigation("Question");
                 });
 
             modelBuilder.Entity("AGILE2024_BE.Models.Survey.SurveyQuestion", b =>

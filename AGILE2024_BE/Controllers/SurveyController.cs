@@ -298,7 +298,8 @@ namespace AGILE2024_BE.Controllers
                     {
                         id = o.Id,
                         answer = o.Answer
-                    })
+                    }),
+                    answerType = q.answerType
                 })
             };
 
@@ -410,6 +411,119 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+
+        //**********************************************************************************
+        // Odoslanie hlasovania používateľa
+        //**********************************************************************************
+        [HttpPost("SubmitVote/{surveyId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> SubmitVote(Guid surveyId, [FromBody] VoteRequest data)
+        {
+            var userId = this.userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+
+            var employee = await dbContext.EmployeeCards
+                .Include(e => e.User)
+                .FirstOrDefaultAsync(e => e.User.Id == userId);
+            if (employee == null)
+                return Unauthorized("Používateľ nemá EmployeeCard.");
+
+
+            var survey = await dbContext.Surveys
+                .Include(s => s.Recipients)
+                .Include(s => s.Questions)
+                    .ThenInclude(q => q.Options)
+                .FirstOrDefaultAsync(s => s.Id == surveyId && s.anoPlatny == 1);
+            if (survey == null)
+                return NotFound("Anketa neexistuje.");
+
+
+            // kontrola času
+            var now = DateTime.Now;
+            if (!(survey.start <= now && now <= survey.end))
+                return BadRequest("Anketa už nie je aktívna.");
+
+
+            // kontrola či už hlasoval
+            bool alreadyVoted = await dbContext.SurveyAnswers
+            .AnyAsync(a =>
+                a.user.Id == employee.Id &&
+                a.survey.Id == survey.Id
+            );
+            if (alreadyVoted)
+                return BadRequest("Už ste hlasovali v tejto ankete.");
+
+
+            // uloženie odpovedí
+            foreach (var item in data.answers)
+            {
+                var questionId = Guid.Parse(item.Key);
+                var selectedOptionIds = item.Value.Select(Guid.Parse).ToList();
+
+                var question = survey.Questions.FirstOrDefault(q => q.Id == questionId);
+                if (question == null) continue;
+
+                var answer = new SurveyAnswer
+                {
+                    Id = Guid.NewGuid(),
+                    survey = survey,
+                    question = question,
+                    user = employee
+                };
+
+                answer.selectedOptions = selectedOptionIds.Select(oId => new SurveyOptionAnswer
+                {
+                    Id = Guid.NewGuid(),
+                    OptionId = oId,
+                    SurveyAnswer = answer
+                }).ToList();
+
+                dbContext.SurveyAnswers.Add(answer);
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Hlas bol uložený." });
+        }
+
+        //**********************************************************************************
+        // Ziskanie odpovedi ak uz som hlasoval
+        //**********************************************************************************
+        [HttpPost("GetVotes/{surveyId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> GetVotes(Guid surveyId)
+        {
+            var userId = this.userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var employee = await dbContext.EmployeeCards
+                .Include(e => e.User)
+                .FirstOrDefaultAsync(e => e.User.Id == userId);
+            if (employee == null)
+                return Unauthorized("Používateľ nemá EmployeeCard.");
+
+            var votes = await dbContext.SurveyAnswers
+                .Where(a => a.survey.Id == surveyId && a.user.Id == employee.Id)
+                .Include(a => a.question)
+                .Include(a => a.survey)
+                .Include(a => a.selectedOptions)
+                .ToListAsync();
+
+            if (votes == null || !votes.Any())
+                return NotFound("Používateľ ešte nehlasoval v tejto ankete.");
+
+            // Preformátovať do slovníka: { questionId: [optionId, ...] }
+            var result = votes.ToDictionary(
+                v => v.question.Id.ToString(),
+                v => v.selectedOptions.Select(o => o.OptionId.ToString()).ToList()
+            );
+
+            return Ok(result);
+        }
+
     }
 
     public class SurveyRequest
@@ -448,6 +562,14 @@ namespace AGILE2024_BE.Controllers
     {
         public string answer { get; set; } = "";
     }
+
+
+    public class VoteRequest
+    {
+        //id otazky a ku tomu id vsetkych zvolenych odpovedi
+        public Dictionary<string, List<string>> answers { get; set; }
+    }
+
 }
 
 
