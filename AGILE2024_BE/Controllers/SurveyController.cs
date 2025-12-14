@@ -276,7 +276,7 @@ namespace AGILE2024_BE.Controllers
             var totalRecipients = await CalculateTotalRecipientsAsync(survey);
 
             // neskôr doplníš keď budeš mať votes tabuľku
-            var totalVotes = 0;
+            var totalVotes = await GetTotalThatSubmittedVote(survey);
 
             var response = new
             {
@@ -304,6 +304,18 @@ namespace AGILE2024_BE.Controllers
             };
 
             return Ok(response);
+        }
+
+
+        private async Task<int> GetTotalThatSubmittedVote(Survey survey)
+        {
+            var total = await dbContext.SurveyAnswers
+                .Where(a => a.survey.Id == survey.Id)
+                .Select(a => a.user.Id)
+                .Distinct() 
+                .CountAsync();
+
+            return total;
         }
 
 
@@ -456,6 +468,8 @@ namespace AGILE2024_BE.Controllers
                 return BadRequest("Už ste hlasovali v tejto ankete.");
 
 
+            using var transaction = await dbContext.Database.BeginTransactionAsync();
+
             // uloženie odpovedí
             foreach (var item in data.answers)
             {
@@ -483,7 +497,20 @@ namespace AGILE2024_BE.Controllers
                 dbContext.SurveyAnswers.Add(answer);
             }
 
+
             await dbContext.SaveChangesAsync();
+
+            // prepočet po uložení hlasov
+            var totalRecipients = await CalculateTotalRecipientsAsync(survey);
+            var totalVotes = await GetTotalThatSubmittedVote(survey);
+
+            if (totalRecipients <= totalVotes)
+            {
+                survey.status = EnumSurveyState.Uzavretá;
+                await dbContext.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
 
             return Ok(new { message = "Hlas bol uložený." });
         }
