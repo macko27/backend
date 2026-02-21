@@ -366,16 +366,16 @@ namespace AGILE2024_BE.Controllers
                 })
             };
 
-            for (int i = 0; i < 50; i++)
-            {
-                SurveyVoterDto dto = new SurveyVoterDto();
-                var name = $"Test Meno {i + 1}";
-                var id = Guid.NewGuid();
-                dto.UserId = id;
-                dto.FullName = name;
-
-                resultDto.questions.First().options.First().voters.Add(dto);
-            }
+            //for (int i = 0; i < 50; i++)
+            //{
+            //    SurveyVoterDto dto = new SurveyVoterDto();
+            //    var name = $"Test Meno {i + 1}";
+            //    var id = Guid.NewGuid();
+            //    dto.UserId = id;
+            //    dto.FullName = name;
+            //
+            //    resultDto.questions.First().options.First().voters.Add(dto);
+            //}
 
             return Ok(resultDto);
 
