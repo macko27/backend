@@ -164,13 +164,46 @@ namespace AGILE2024_BE.Controllers
             if (employee == null)
                 return BadRequest("EmployeeCard neexistuje.");
 
-            var surveys = await dbContext.Surveys
+            var response = await GetSurveysByCreator(employeeId, false);
+
+            return Ok(response);
+        }
+
+
+        //**********************************************************************************
+        // Vratenie ankiet ktore vytvoril dany veduci podla id veduceho pre vysledky
+        // Vysledky ankety
+        //**********************************************************************************
+        [HttpGet("GetMyEndedSurveys/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> GetMyEndedSurveys(Guid employeeId)
+        {
+            var employee = await dbContext.EmployeeCards
+                .FirstOrDefaultAsync(e => e.Id == employeeId);
+
+            if (employee == null)
+                return BadRequest("EmployeeCard neexistuje.");
+
+            var response = await GetSurveysByCreator(employeeId, true);
+
+            return Ok(response);
+        }
+
+
+        private async Task<List<object>> GetSurveysByCreator(Guid emloyeeId, bool onlyEnded) 
+        {
+            var query = dbContext.Surveys
                 .Include(s => s.Recipients)
                 .Include(s => s.Questions)
-                .Where(s => s.createdBy.Id == employee.Id && s.anoPlatny == 1)
-                .ToListAsync();
+                .ThenInclude(q => q.Options)
+                .Where(s => s.createdBy.Id == emloyeeId && s.anoPlatny == 1);
 
-            var response = surveys.Select(s => new
+            if (onlyEnded)
+            {
+                query = query.Where(s => s.status == EnumSurveyState.Uzavretá);
+            }
+
+            var response = await query.Select(s => new
             {
                 s.Id,
                 s.name,
@@ -186,10 +219,12 @@ namespace AGILE2024_BE.Controllers
                     question = q.question,
                     options = q.Options.Select(o => new { id = o.Id, answer = o.Answer })
                 })
-            });
+            }).ToListAsync();
 
-            return Ok(response);
+            return response.Cast<object>().ToList();
         }
+
+        
 
         //**********************************************************************************
         // Vyhľadávanie zamestnancov / oddelení pre výber príjemcov
@@ -252,6 +287,98 @@ namespace AGILE2024_BE.Controllers
                 .ToList();
 
             return Ok(result);
+        }
+
+
+
+        //**********************************************************************************
+        // Vysledky ankety podľa ID
+        //**********************************************************************************
+        [HttpGet("GetResult/{surveyId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        public async Task<IActionResult> GetSurveyResult(Guid surveyId)
+        {
+            var survey = await dbContext.Surveys
+                .Include(s => s.createdBy)
+                .Include(s => s.Recipients)
+                .Include(s => s.Questions)
+                    .ThenInclude(q => q.Options)
+                .FirstOrDefaultAsync(s => s.Id == surveyId && s.anoPlatny == 1);
+
+            if (survey == null)
+                return NotFound("Anketa neexistuje.");
+
+            if (survey.status != EnumSurveyState.Uzavretá)
+                return Forbid("Anketa este nie je uzavreta!");
+
+            var totalRecipientCount = await CalculateTotalRecipientsAsync(survey);
+            var recipeintsSubmittedVoteCount = await GetTotalThatSubmittedVote(survey);
+
+            var answers = await dbContext.SurveyAnswers
+                .Where(a => a.survey.Id == surveyId)
+                .Include(a => a.selectedOptions)
+                .Include(a => a.user)
+                    .ThenInclude(u => u.User)
+                .ToListAsync();
+
+            var optionVotesWithUsers = answers
+                .SelectMany(a => a.selectedOptions.Select(o => new
+                {
+                    o.OptionId,
+                    UserId = a.user.Id,
+                    FullName = a.user.User!.Name + " " + a.user.User!.Surname
+                }))
+                .GroupBy(x => x.OptionId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => new SurveyVoterDto
+                    {
+                        UserId = x.UserId,
+                        FullName = x.FullName
+                    }).ToList()
+                );
+
+            var resultDto = new
+            {
+                survey.Id,
+                survey.name,
+                survey.info,
+                survey.SurveyType,
+                survey.start,
+                survey.end,
+                totalRecipientCount,
+                recipeintsSubmittedVoteCount,
+
+                questions = survey.Questions.Select(q => new
+                {
+                    q.Id,
+                    question = q.question,
+                    q.answerType,
+                    options = q.Options.Select(o => new
+                    {
+                        o.Id,
+                        answer = o.Answer,
+
+                        votes = optionVotesWithUsers.ContainsKey(o.Id) ? optionVotesWithUsers[o.Id].Count : 0,
+
+                        voters = survey.SurveyType.Equals("anonymous") ? new List<SurveyVoterDto>() : (optionVotesWithUsers.ContainsKey(o.Id) ? optionVotesWithUsers[o.Id] : new List<SurveyVoterDto>())
+                    })
+                })
+            };
+
+            for (int i = 0; i < 50; i++)
+            {
+                SurveyVoterDto dto = new SurveyVoterDto();
+                var name = $"Test Meno {i + 1}";
+                var id = Guid.NewGuid();
+                dto.UserId = id;
+                dto.FullName = name;
+
+                resultDto.questions.First().options.First().voters.Add(dto);
+            }
+
+            return Ok(resultDto);
+
         }
 
 
@@ -595,6 +722,12 @@ namespace AGILE2024_BE.Controllers
     {
         //id otazky a ku tomu id vsetkych zvolenych odpovedi
         public Dictionary<string, List<string>> answers { get; set; }
+    }
+
+    public class SurveyVoterDto
+    {
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
     }
 
 }
