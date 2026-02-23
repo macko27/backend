@@ -125,6 +125,7 @@ namespace AGILE2024_BE.API
             webAppBuilder.Services.AddScoped<INotificationHandler, GoalNotificationHandler>();
             webAppBuilder.Services.AddScoped<INotificationHandler, FeedbackNotificationHandler>();
             webAppBuilder.Services.AddScoped<INotificationHandler, ReviewNotificationHandler>();
+            webAppBuilder.Services.AddScoped<INotificationHandler, SurveyNotificationHandler>();
             webAppBuilder.Services.AddHostedService<NotificationService>();
 
             webAppBuilder.Services.AddControllers();

@@ -8,6 +8,9 @@
         FeedbackUnsentReminderNotificationType,
         ReviewUnsentReminderNotificationType,
         GoalUnfinishedReminderNotificationType,
-        NewSuccessionNotificationType
+        NewSuccessionNotificationType,
+        SurveyAssignedNotificationType,
+        SurveyCompletedNotificationType,
+        SurveyExpiredNotificationType
     }
 }

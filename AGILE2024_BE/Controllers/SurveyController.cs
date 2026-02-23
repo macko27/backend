@@ -8,6 +8,8 @@ using AGILE2024_BE.Models.Enums;
 using AGILE2024_BE.Models.Survey;
 using AGILE2024_BE.Models;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using AGILE2024_BE.Services;
+using Microsoft.AspNetCore.SignalR;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -20,13 +22,15 @@ namespace AGILE2024_BE.Controllers
         private RoleManager<IdentityRole> roleManager;
         private IConfiguration config;
         private AgileDBContext dbContext;
+        private readonly IHubContext<NotificationHub> hubContext;
 
-        public SurveyController(UserManager<ExtendedIdentityUser> um, IConfiguration co, RoleManager<IdentityRole> rm, AgileDBContext db)
+        public SurveyController(UserManager<ExtendedIdentityUser> um, IConfiguration co, RoleManager<IdentityRole> rm, AgileDBContext db, IHubContext<NotificationHub> hubContext)
         {
             this.userManager = um;
             this.config = co;
             this.roleManager = rm;
             this.dbContext = db;
+            this.hubContext = hubContext;
         }
 
         //**********************************************************************************
@@ -95,9 +99,92 @@ namespace AGILE2024_BE.Controllers
             dbContext.Surveys.Add(survey);
             await dbContext.SaveChangesAsync();
 
+            //notifikacie
+            if (survey.status == EnumSurveyState.Aktívna)
+            {
+                var users = await GetSurveyRecipientUsersAsync(survey);
+                var notifications = new List<Notification>();
+
+                foreach (var user in users)
+                {
+                    notifications.Add(new Notification
+                    {
+                        Id = Guid.NewGuid(),
+                        CreatedAt = DateTime.Now,
+                        IsRead = false,
+                        NotificationType = EnumNotificationType.SurveyAssignedNotificationType,
+                        ReferencedItemId = survey.Id,
+                        Message = $"Máte novú anketu: {survey.name}",
+                        User = user
+                    });
+                }
+
+                dbContext.Notifications.AddRange(notifications);
+                await dbContext.SaveChangesAsync();
+
+                foreach (var notification in notifications)
+                {
+                    var response = new NotificationResponse
+                    {
+                        Id = notification.Id,
+                        CreatedAt = notification.CreatedAt,
+                        IsRead = notification.IsRead,
+                        Message = notification.Message,
+                        NotificationType = notification.NotificationType,
+                        ReferencedItem = notification.ReferencedItemId.ToString(),
+                        Title = NotificationHelpers.GetNotificationTitle(notification.NotificationType)
+                    };
+
+                    await hubContext.Clients.User(notification.User.Id)
+                        .SendAsync("ReceiveNotification", response);
+                }
+            }
 
             return Ok(new { surveyId = survey.Id });
         }
+
+
+
+        //**********************************************************************************
+        // Ziskanie vsetkych unikatnych prijemcov pre anketu
+        //**********************************************************************************
+        private async Task<List<ExtendedIdentityUser>> GetSurveyRecipientUsersAsync(Survey survey)
+        {
+            var userList = new List<ExtendedIdentityUser>();
+
+            foreach (var r in survey.Recipients)
+            {
+                if (r.Type == "employee")
+                {
+                    var user = await dbContext.EmployeeCards
+                        .Include(e => e.User)
+                        .Where(e => e.Id == r.EmployeeCardId)
+                        .Select(e => e.User)
+                        .FirstOrDefaultAsync();
+
+                    if (user != null)
+                        userList.Add(user);
+                }
+
+                else if (r.Type == "department")
+                {
+                    var departmentUsers = await dbContext.EmployeeCards
+                        .Include(e => e.User)
+                        .Where(e => e.Department.Id == r.EmployeeCardId)
+                        .Select(e => e.User)
+                        .ToListAsync();
+
+                    userList.AddRange(departmentUsers);
+                }
+            }
+
+            // Odstránenie duplicít
+            return userList
+                .GroupBy(u => u.Id)
+                .Select(g => g.First())
+                .ToList();
+        }
+
 
 
         //**********************************************************************************
@@ -574,6 +661,8 @@ namespace AGILE2024_BE.Controllers
                 .Include(s => s.Recipients)
                 .Include(s => s.Questions)
                     .ThenInclude(q => q.Options)
+                .Include(s => s.createdBy)
+                    .ThenInclude(ec => ec.User)
                 .FirstOrDefaultAsync(s => s.Id == surveyId && s.anoPlatny == 1);
             if (survey == null)
                 return NotFound("Anketa neexistuje.");
@@ -635,6 +724,46 @@ namespace AGILE2024_BE.Controllers
             {
                 survey.status = EnumSurveyState.Uzavretá;
                 await dbContext.SaveChangesAsync();
+
+                // ===========================
+                // Odoslanie notifikácie tvorcovi
+                // ===========================
+                var creatorUser = survey.createdBy?.User;
+                if (creatorUser != null)
+                {
+                    var notification = new Notification
+                    {
+                        Id = Guid.NewGuid(),
+                        User = creatorUser,
+                        ReferencedItemId = survey.Id,
+                        Message = $"Anketa '{survey.name}' bola uzavretá – všetci účastníci hlasovali.",
+                        CreatedAt = DateTime.Now,
+                        IsRead = false,
+                        NotificationType = EnumNotificationType.SurveyCompletedNotificationType
+                    };
+
+                    dbContext.Notifications.Add(notification);
+                    await dbContext.SaveChangesAsync();
+
+                    try
+                    {
+                        await hubContext.Clients.User(creatorUser.Id)
+                            .SendAsync("ReceiveNotification", new NotificationResponse
+                            {
+                                Id = notification.Id,
+                                Message = notification.Message,
+                                Title = NotificationHelpers.GetNotificationTitle(notification.NotificationType),
+                                ReferencedItem = survey.Id.ToString(),
+                                NotificationType = notification.NotificationType,
+                                CreatedAt = notification.CreatedAt,
+                                IsRead = notification.IsRead
+                            });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error sending notification to user {creatorUser.Id}: {ex.Message}");
+                    }
+                }
             }
 
             await transaction.CommitAsync();
