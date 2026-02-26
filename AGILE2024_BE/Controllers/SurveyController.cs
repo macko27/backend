@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using AGILE2024_BE.Models.Enums;
 using AGILE2024_BE.Models.Survey;
 using AGILE2024_BE.Models;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using AGILE2024_BE.Services;
 using Microsoft.AspNetCore.SignalR;
 
@@ -55,7 +54,7 @@ namespace AGILE2024_BE.Controllers
             }
 
             EnumSurveyState calculatedStatus;
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             if (data.start <= now && now <= data.end)
             {
                 calculatedStatus = EnumSurveyState.Aktívna; // 0
@@ -110,7 +109,7 @@ namespace AGILE2024_BE.Controllers
                     notifications.Add(new Notification
                     {
                         Id = Guid.NewGuid(),
-                        CreatedAt = DateTime.Now,
+                        CreatedAt = DateTime.UtcNow,
                         IsRead = false,
                         NotificationType = EnumNotificationType.SurveyAssignedNotificationType,
                         ReferencedItemId = survey.Id,
@@ -669,7 +668,7 @@ namespace AGILE2024_BE.Controllers
 
 
             // kontrola času
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             if (!(survey.start <= now && now <= survey.end))
                 return BadRequest("Anketa už nie je aktívna.");
 
@@ -737,7 +736,7 @@ namespace AGILE2024_BE.Controllers
                         User = creatorUser,
                         ReferencedItemId = survey.Id,
                         Message = $"Anketa '{survey.name}' bola uzavretá – všetci účastníci hlasovali.",
-                        CreatedAt = DateTime.Now,
+                        CreatedAt = DateTime.UtcNow,
                         IsRead = false,
                         NotificationType = EnumNotificationType.SurveyCompletedNotificationType
                     };
@@ -816,8 +815,8 @@ namespace AGILE2024_BE.Controllers
         public EnumSurveyState status { get; set; }
 
         public Guid createdById { get; set; }
-        public DateTime start { get; set; } = DateTime.Now;
-        public DateTime end { get; set; } = DateTime.Now;
+        public DateTime start { get; set; } = DateTime.UtcNow;
+        public DateTime end { get; set; } = DateTime.UtcNow;
         public string surveyType { get; set; } = "anonymous";
         public ICollection<RecipientRequest>? recipients { get; set; } = new List<RecipientRequest>();
 

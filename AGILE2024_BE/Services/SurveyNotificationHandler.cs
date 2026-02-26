@@ -6,6 +6,7 @@ using AGILE2024_BE.Models.Survey;
 using AGILE2024_BE.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using AGILE2024_BE.Helpers;
 
 namespace AGILE2024_BE.Services
 {
@@ -23,8 +24,11 @@ namespace AGILE2024_BE.Services
 
         public async Task HandleNotificationAsync(CancellationToken cancellationToken)
         {
-            await ActivateScheduledSurveys(cancellationToken);
-            await HandleSurveyExpiration(cancellationToken);
+            //azure pouziva UTC pasmo
+            var utcTime = DateTime.UtcNow;
+
+            await ActivateScheduledSurveys(cancellationToken, utcTime);
+            await HandleSurveyExpiration(cancellationToken, utcTime);
         }
 
 
@@ -32,16 +36,26 @@ namespace AGILE2024_BE.Services
         //**********************************************************************************
         // Posielanie notifikacii pre ankety ktore su vytvorene do buducnosti
         //**********************************************************************************
-        private async Task ActivateScheduledSurveys(CancellationToken cancellationToken)
+        private async Task ActivateScheduledSurveys(CancellationToken cancellationToken, DateTime utcTime)
         {
-            var now = DateTime.Now;
-            var nowTruncated = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
+            //var now = DateTime.Now;
+            //var nowTruncated = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
+
+            //var surveysToActivate = await dbContext.Surveys
+            //    .Include(s => s.Recipients)
+            //    .Include(s => s.createdBy)
+            //    .Where(s =>
+            //        s.status == EnumSurveyState.Neaktívna && EF.Functions.DateDiffMinute(s.start, now) >= 0)
+            //    .ToListAsync(cancellationToken);
+
+            
 
             var surveysToActivate = await dbContext.Surveys
                 .Include(s => s.Recipients)
                 .Include(s => s.createdBy)
                 .Where(s =>
-                    s.status == EnumSurveyState.Neaktívna && EF.Functions.DateDiffMinute(s.start, now) >= 0)
+                    s.status == EnumSurveyState.Neaktívna &&
+                    s.start <= utcTime)
                 .ToListAsync(cancellationToken);
 
             foreach (var survey in surveysToActivate)
@@ -96,21 +110,28 @@ namespace AGILE2024_BE.Services
         //**********************************************************************************
         // Ak ankete vyprsi cas tak je uavreta a je poslana notifikacia
         //**********************************************************************************
-        private async Task HandleSurveyExpiration(CancellationToken cancellationToken)
+        private async Task HandleSurveyExpiration(CancellationToken cancellationToken, DateTime utcTime)
         {
-            var now = DateTime.Now;
-            var nowTruncated = new DateTime(
-                now.Year, now.Month, now.Day,
-                now.Hour, now.Minute, 0);
+            //var now = DateTime.Now;
+            //var nowTruncated = new DateTime(
+            //    now.Year, now.Month, now.Day,
+            //    now.Hour, now.Minute, 0);
+
+            //var expiredSurveys = await dbContext.Surveys
+            //    .Include(s => s.createdBy)
+            //        .ThenInclude(c => c.User)
+            //    .Where(s =>
+            //        s.status == EnumSurveyState.Aktívna && EF.Functions.DateDiffMinute(s.end, nowTruncated) >= 0)
+            //    .ToListAsync(cancellationToken);
+
 
             var expiredSurveys = await dbContext.Surveys
                 .Include(s => s.createdBy)
                     .ThenInclude(c => c.User)
                 .Where(s =>
-                    s.status == EnumSurveyState.Aktívna && EF.Functions.DateDiffMinute(s.end, nowTruncated) >= 0)
+                    s.status == EnumSurveyState.Aktívna &&
+                    s.end <= utcTime)
                 .ToListAsync(cancellationToken);
-
-
 
             foreach (var survey in expiredSurveys)
             {
