@@ -4,6 +4,7 @@ using AGILE2024_BE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AGILE2024_BE.Migrations
 {
     [DbContext(typeof(AgileDBContext))]
-    partial class AgileDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260307194512_RecognitionAdd")]
+    partial class RecognitionAdd
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -917,58 +920,6 @@ namespace AGILE2024_BE.Migrations
                     b.ToTable("Organizations");
                 });
 
-            modelBuilder.Entity("AGILE2024_BE.Models.Recognition.Recognition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("DateIn")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("EmployeeCardId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<int>("Odmena")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Predmet")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("anoPlatny")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeCardId");
-
-                    b.ToTable("Recognitions");
-                });
-
-            modelBuilder.Entity("AGILE2024_BE.Models.Recognition.RecognitionRecipient", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("EmployeeCardId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("RecognitionId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecognitionId");
-
-                    b.ToTable("RecognitionRecipients");
-                });
-
             modelBuilder.Entity("AGILE2024_BE.Models.Review", b =>
                 {
                     b.Property<Guid>("id")
@@ -1727,28 +1678,6 @@ namespace AGILE2024_BE.Migrations
                     b.Navigation("Location");
                 });
 
-            modelBuilder.Entity("AGILE2024_BE.Models.Recognition.Recognition", b =>
-                {
-                    b.HasOne("AGILE2024_BE.Models.EmployeeCard", "createdBy")
-                        .WithMany()
-                        .HasForeignKey("EmployeeCardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("createdBy");
-                });
-
-            modelBuilder.Entity("AGILE2024_BE.Models.Recognition.RecognitionRecipient", b =>
-                {
-                    b.HasOne("AGILE2024_BE.Models.Recognition.Recognition", "Recognition")
-                        .WithMany("Recipients")
-                        .HasForeignKey("RecognitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Recognition");
-                });
-
             modelBuilder.Entity("AGILE2024_BE.Models.Review", b =>
                 {
                     b.HasOne("AGILE2024_BE.Models.EmployeeCard", "sender")
@@ -1956,11 +1885,6 @@ namespace AGILE2024_BE.Migrations
             modelBuilder.Entity("AGILE2024_BE.Models.Organization", b =>
                 {
                     b.Navigation("RelatedDepartments");
-                });
-
-            modelBuilder.Entity("AGILE2024_BE.Models.Recognition.Recognition", b =>
-                {
-                    b.Navigation("Recipients");
                 });
 
             modelBuilder.Entity("AGILE2024_BE.Models.Survey.Survey", b =>
