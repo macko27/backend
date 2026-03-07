@@ -49,7 +49,7 @@ namespace AGILE2024_BE.Controllers
             if (employeeCard == null)
                 return BadRequest("EmployeeCard pre daného používateľa neexistuje.");
 
-            var departmentId = employeeCard.Department?.Id;
+            var departmentId = employeeCard.Department?.Id; 
 
             var recognitions = await dbContext.Recognitions
                 .Include(s => s.createdBy)
