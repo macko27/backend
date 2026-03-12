@@ -11,5 +11,8 @@ namespace AGILE2024_BE.Models.Recognition
         public Recognition Recognition { get; set; }
 
         public required Guid EmployeeCardId { get; set; }
+
+        [ForeignKey("EmployeeCardId")]
+        public EmployeeCard EmployeeCard { get; set; } = null!;
     }
 }

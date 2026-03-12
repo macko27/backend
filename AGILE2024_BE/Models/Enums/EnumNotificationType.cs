@@ -11,6 +11,7 @@
         NewSuccessionNotificationType,
         SurveyAssignedNotificationType,
         SurveyCompletedNotificationType,
-        SurveyExpiredNotificationType
+        SurveyExpiredNotificationType,
+        RecognitionCreated
     }
 }
