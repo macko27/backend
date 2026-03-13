@@ -56,6 +56,7 @@ namespace AGILE2024_BE.Controllers
 
             var recognitions = await dbContext.Recognitions
                 .Include(r => r.createdBy)
+                    .ThenInclude(cr => cr.User)
                 .Include(r => r.Recipients)
                     .ThenInclude(rec => rec.EmployeeCard)
                         .ThenInclude(ec => ec.User)
@@ -68,7 +69,13 @@ namespace AGILE2024_BE.Controllers
                 s.Id,
                 s.Predmet,
                 s.Text,
-                createdById = s.createdBy.Id,
+                s.DateIn,
+                odmena = s.Odmena > 0 ? s.Odmena.ToString() : "-",
+                createdBy = new
+                {
+                    id = s.createdBy.Id,
+                    fullName = s.createdBy.User.Name + " " + s.createdBy.User.Surname
+                },
                 recipients = s.Recipients.Select(q => new
                 {
                     id = q.EmployeeCardId,
@@ -101,6 +108,7 @@ namespace AGILE2024_BE.Controllers
 
             var recognitions = await dbContext.Recognitions
                 .Include(r => r.createdBy)
+                    .ThenInclude(cr => cr.User)
                 .Include(r => r.Recipients)
                     .ThenInclude(rec => rec.EmployeeCard)
                         .ThenInclude(ec => ec.User)
@@ -113,7 +121,13 @@ namespace AGILE2024_BE.Controllers
                 s.Id,
                 s.Predmet,
                 s.Text,
-                createdById = s.createdBy.Id,
+                s.DateIn,
+                odmena = s.Odmena > 0 ? s.Odmena.ToString() : "-",
+                createdBy = new
+                {
+                    id = s.createdBy.Id,
+                    fullName = s.createdBy.User.Name + " " + s.createdBy.User.Surname
+                },
                 recipients = s.Recipients.Select(q => new
                 {
                     id = q.EmployeeCardId,
