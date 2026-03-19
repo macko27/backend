@@ -17,5 +17,6 @@ namespace AGILE2024_BE.Models.Recognition
         public required DateTime DateIn { get; set; } = DateTime.UtcNow;
         public ICollection<RecognitionRecipient>? Recipients { get; set; } = new List<RecognitionRecipient>();
         public int anoPlatny { get; set; }
+        public EnumRecognitionState state { get; set; }
     }
 }
