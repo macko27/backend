@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using AGILE2024_BE.Models.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AGILE2024_BE.Models.Recognition
 {
@@ -14,5 +15,10 @@ namespace AGILE2024_BE.Models.Recognition
 
         [ForeignKey("EmployeeCardId")]
         public EmployeeCard EmployeeCard { get; set; } = null!;
+
+        public EnumRecognitionState State { get; set; } = EnumRecognitionState.Cakajuca;
+
+        public int anoPlatny { get; set; } = 1;
+        public string? dovod { get; set;  }
     }
 }

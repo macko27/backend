@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using AGILE2024_BE.Models.Recognition;
 using AGILE2024_BE.Models;
 using AGILE2024_BE.Services;
+using Microsoft.IdentityModel.Tokens;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -38,7 +39,6 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetRecieved/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> GetRecievedRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -48,31 +48,32 @@ namespace AGILE2024_BE.Controllers
                 return BadRequest("EmployeeCard neexistuje.");
 
             var data = await BaseRecognitionQuery()
-                .Where(r =>
-                    r.Recipients.Any(rec => rec.EmployeeCardId == employeeId) &&
-                    r.state != EnumRecognitionState.Zamietnuta &&
-                    r.state != EnumRecognitionState.Cakajuca
-                )
-                .OrderByDescending(r => r.DateIn)
-                .Select(s => new
+                .Where(r => r.Recipients.Any(rec =>
+                    rec.EmployeeCardId == employeeId &&
+                    (rec.State == EnumRecognitionState.Schvalena ||
+                     rec.State == EnumRecognitionState.SchvalenaSUpravou)
+                ))
+                .Select(r => new
                 {
-                    s.Id,
-                    s.Predmet,
-                    s.Text,
-                    s.DateIn,
-                    odmena = s.Odmena > 0 ? s.Odmena.ToString() : "-",
+                    r.Id,
+                    r.Predmet,
+                    r.Text,
+                    r.DateIn,
+                    odmena = r.Odmena > 0 ? r.Odmena.ToString() : "-",
+
                     createdBy = new
                     {
-                        id = s.createdBy.Id,
-                        fullName = s.createdBy.User.Name + " " + s.createdBy.User.Surname
+                        id = r.createdBy.Id,
+                        fullName = r.createdBy.User.Name + " " + r.createdBy.User.Surname
                     },
-                    recipients = s.Recipients.Select(q => new
-                    {
-                        id = q.EmployeeCardId,
-                        fullName = q.EmployeeCard.User.Name + " " + q.EmployeeCard.User.Surname
-                    }),
-                    state = s.state,
+
+                    myState = r.Recipients
+                        .Where(rec => rec.EmployeeCardId == employeeId)
+                        .Select(rec => rec.State)
+                        .FirstOrDefault(),
+
                 })
+                .OrderByDescending(r => r.DateIn)
                 .ToListAsync();
 
             return Ok(data);
@@ -85,7 +86,6 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetSent/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> GetSentRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -95,30 +95,83 @@ namespace AGILE2024_BE.Controllers
                 return BadRequest("EmployeeCard neexistuje.");
 
             var data = await BaseRecognitionQuery()
-                .Where(r =>
-                    r.createdBy.Id == employeeId &&
-                    r.anoPlatny == 1
-                )
-                .OrderByDescending(r => r.DateIn)
-                .Select(s => new
+                .Where(r => r.createdBy.Id == employeeId)
+                .Select(r => new
                 {
-                    s.Id,
-                    s.Predmet,
-                    s.Text,
-                    s.DateIn,
-                    odmena = s.Odmena > 0 ? s.Odmena.ToString() : "-",
+                    r.Id,
+                    r.Predmet,
+                    r.Text,
+                    r.DateIn,
+                    odmena = r.Odmena > 0 ? r.Odmena.ToString() : "-",
+
                     createdBy = new
                     {
-                        id = s.createdBy.Id,
-                        fullName = s.createdBy.User.Name + " " + s.createdBy.User.Surname
+                        id = r.createdBy.Id,
+                        fullName = r.createdBy.User.Name + " " + r.createdBy.User.Surname
                     },
-                    recipients = s.Recipients.Select(q => new
+
+                    // 🔥 KAŽDÝ RECIPIENT MÁ VLASTNÝ STATE
+                    recipients = r.Recipients.Select(q => new
                     {
                         id = q.EmployeeCardId,
-                        fullName = q.EmployeeCard.User.Name + " " + q.EmployeeCard.User.Surname
+                        fullName = q.EmployeeCard.User.Name + " " + q.EmployeeCard.User.Surname,
+                        state = q.State
                     }),
-                    state = s.state,
                 })
+                .OrderByDescending(r => r.DateIn)
+                .ToListAsync();
+
+            return Ok(data);
+        }
+
+
+
+        //**********************************************************************************
+        // Ziskanie uznani na schvalenie, veduci schvaluje uznania kde prijemcovia su vsetci z jeho oddelenia inac schvaluje admin
+        // veduci z oddelenia z ktoreho je createdBy to schvaluje
+        //**********************************************************************************
+        [HttpGet("GetToBeApproved/{employeeId}")]
+        public async Task<IActionResult> GetToBeApproved(Guid employeeId)
+        {
+            var employee = await dbContext.EmployeeCards
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(ec => ec.Id == employeeId);
+
+            if (employee == null)
+                return BadRequest("EmployeeCard neexistuje.");
+
+            var departmentId = employee.Department.Id;
+
+            var data = await BaseRecognitionQuery()
+                .SelectMany(r => r.Recipients
+                    .Where(rec =>
+                        rec.State == EnumRecognitionState.Cakajuca &&
+                        rec.EmployeeCard.Department.Id == departmentId
+                    )
+                    .Select(rec => new
+                    {
+                        recipientRecordId = rec.Id,
+                        recognitionId = r.Id,
+                        predmet = r.Predmet,
+                        text = r.Text,
+                        dateIn = r.DateIn,
+
+                        createdBy = new
+                        {
+                            id = r.createdBy.Id,
+                            fullName = r.createdBy.User.Name + " " + r.createdBy.User.Surname
+                        },
+
+                        recipient = new
+                        {
+                            id = rec.EmployeeCardId,
+                            fullName = rec.EmployeeCard.User.Name + " " + rec.EmployeeCard.User.Surname,
+                            state = rec.State,
+                            odmena = r.Odmena
+                        }
+                    })
+                )
+                .OrderByDescending(x => x.dateIn)
                 .ToListAsync();
 
             return Ok(data);
@@ -166,7 +219,6 @@ namespace AGILE2024_BE.Controllers
                     Odmena = data.odmena,
                     createdBy = createdBy,
                     DateIn = DateTime.UtcNow,
-                    anoPlatny = 1,
                     Recipients = data.recipients.Select(r => new RecognitionRecipient
                     {
                         Id = Guid.NewGuid(),
@@ -175,47 +227,92 @@ namespace AGILE2024_BE.Controllers
                 };
 
                 //nastavenie stavu
-                await SetRecognitionState(recognition);
+                foreach (var recipient in recognition.Recipients)
+                {
+                    recipient.State = await GetInitialStateForRecipient(recognition, recipient);
+                }
 
                 dbContext.Recognitions.Add(recognition);
                 await dbContext.SaveChangesAsync();
 
-                //notifikacie
+                // notifikacie
                 var users = await GetSurveyRecipientUsersAsync(recognition);
                 var notifications = new List<Notification>();
 
-                foreach (var user in users)
+                // 🔥 1. NOTIFIKÁCIA PRE VEDÚCICH (iba ak existuje pending recipient)
+                var hasPending = recognition.Recipients
+                    .Any(r => r.State == EnumRecognitionState.Cakajuca);
+
+                if (hasPending)
                 {
-                    notifications.Add(new Notification
+                    var leaders = await GetLeadersFromCreatorDepartment(recognition);
+
+                    foreach (var leader in leaders)
                     {
-                        Id = Guid.NewGuid(),
-                        CreatedAt = DateTime.UtcNow,
-                        IsRead = false,
-                        NotificationType = EnumNotificationType.RecognitionCreated,
-                        ReferencedItemId = recognition.Id,
-                        Message = $"Dostali ste uznanie: {recognition.Predmet}",
-                        User = user
-                    });
+                        notifications.Add(new Notification
+                        {
+                            Id = Guid.NewGuid(),
+                            CreatedAt = DateTime.UtcNow,
+                            IsRead = false,
+                            NotificationType = EnumNotificationType.RecognitionCreated,
+                            ReferencedItemId = recognition.Id,
+                            Message = $"Uznanie čaká na schválenie: {recognition.Predmet}",
+                            User = leader
+                        });
+                    }
                 }
 
-                dbContext.Notifications.AddRange(notifications);
-                await dbContext.SaveChangesAsync();
 
-                foreach (var notification in notifications)
+                //NOTIFIKÁCIE PRE RECIPIENTOV (KAŽDÝ PODĽA STAVU)
+                foreach (var recipient in recognition.Recipients)
                 {
-                    var response = new NotificationResponse
+                    if (recipient.State == EnumRecognitionState.Schvalena)
                     {
-                        Id = notification.Id,
-                        CreatedAt = notification.CreatedAt,
-                        IsRead = notification.IsRead,
-                        Message = notification.Message,
-                        NotificationType = notification.NotificationType,
-                        ReferencedItem = notification.ReferencedItemId.ToString(),
-                        Title = NotificationHelpers.GetNotificationTitle(notification.NotificationType)
-                    };
+                        var user = await dbContext.EmployeeCards
+                            .Include(e => e.User)
+                            .Where(e => e.Id == recipient.EmployeeCardId)
+                            .Select(e => e.User)
+                            .FirstOrDefaultAsync();
 
-                    await hubContext.Clients.User(notification.User.Id)
-                        .SendAsync("ReceiveNotification", response);
+                        if (user == null)
+                            continue;
+
+
+                        notifications.Add(new Notification
+                        {
+                            Id = Guid.NewGuid(),
+                            CreatedAt = DateTime.UtcNow,
+                            IsRead = false,
+                            NotificationType = EnumNotificationType.RecognitionCreated,
+                            ReferencedItemId = recognition.Id,
+                            Message = $"Dostali ste uznanie: {recognition.Predmet}",
+                            User = user
+                        });
+                    }
+                    
+                }
+
+                if (!notifications.IsNullOrEmpty())
+                {
+                    dbContext.Notifications.AddRange(notifications);
+                    await dbContext.SaveChangesAsync();
+
+                    foreach (var notification in notifications)
+                    {
+                        var response = new NotificationResponse
+                        {
+                            Id = notification.Id,
+                            CreatedAt = notification.CreatedAt,
+                            IsRead = notification.IsRead,
+                            Message = notification.Message,
+                            NotificationType = notification.NotificationType,
+                            ReferencedItem = notification.ReferencedItemId.ToString(),
+                            Title = NotificationHelpers.GetNotificationTitle(notification.NotificationType)
+                        };
+
+                        await hubContext.Clients.User(notification.User.Id)
+                            .SendAsync("ReceiveNotification", response);
+                    }
                 }
 
 
@@ -232,68 +329,93 @@ namespace AGILE2024_BE.Controllers
         //**********************************************************************************
         // Nastavenie stavu uznania podla role
         //**********************************************************************************
-        private async Task SetRecognitionState(Recognition recognition)
+        private async Task<EnumRecognitionState> GetInitialStateForRecipient(
+            Recognition recognition,
+            RecognitionRecipient recipient)
         {
             var creator = await dbContext.EmployeeCards
-            .Include(e => e.User)
-            .Include(e => e.Department)
-            .FirstOrDefaultAsync(e => e.Id == recognition.createdBy.Id);
+                .Include(e => e.User)
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(e => e.Id == recognition.createdBy.Id);
 
             if (creator == null)
-                return;
+                return EnumRecognitionState.Cakajuca;
 
-            //ziskanie role
             var roles = await userManager.GetRolesAsync(creator.User);
 
             bool isEmployee = roles.Contains(RolesDef.Zamestnanec);
             bool isLeader = roles.Contains(RolesDef.Veduci);
 
-            //ZAMESTNANEC
+            // zamestnanec
             if (isEmployee && !isLeader)
             {
-                recognition.state = recognition.Odmena > 0
+                return recognition.Odmena > 0
                     ? EnumRecognitionState.Cakajuca
                     : EnumRecognitionState.Schvalena;
-
-                return;
             }
 
-            //VEDÚCI
+            // vedúci
             if (isLeader)
             {
-                // bez odmeny → schválené
+                var recipientEmployee = await dbContext.EmployeeCards
+                    .Include(e => e.Department)
+                    .FirstOrDefaultAsync(e => e.Id == recipient.EmployeeCardId);
+
+                if (recipientEmployee == null)
+                    return EnumRecognitionState.Cakajuca;
+
                 if (recognition.Odmena <= 0)
-                {
-                    recognition.state = EnumRecognitionState.Schvalena;
-                    return;
-                }
+                    return EnumRecognitionState.Schvalena;
 
-                // skontroluj oddelenia príjemcov
-                var recipientDepartments = await dbContext.EmployeeCards
-                    .Where(e => recognition.Recipients.Select(r => r.EmployeeCardId).Contains(e.Id))
-                    .Select(e => e.Department.Id)
-                    .ToListAsync();
-
-                bool allSameDepartment = recipientDepartments
-                    .All(d => d == creator.Department.Id);
-
-                if (allSameDepartment)
-                {
-                    // všetci sú z rovnakého oddelenia → schválené
-                    recognition.state = EnumRecognitionState.Schvalena;
-                }
-                else
-                {
-                    // niekto je mimo → čaká na správcu
-                    recognition.state = EnumRecognitionState.Cakajuca;
-                }
-
-                return;
+                return recipientEmployee.Department.Id == creator.Department.Id
+                    ? EnumRecognitionState.Schvalena
+                    : EnumRecognitionState.Cakajuca;
             }
 
-            // fallback
-            recognition.state = EnumRecognitionState.Cakajuca;
+            return EnumRecognitionState.Cakajuca;
         }
+
+
+        //**********************************************************************************
+        // Ziskanie vsetkych veducich pre toho co to vytvoril pre oddelenie
+        //**********************************************************************************
+        private async Task<List<ExtendedIdentityUser>> GetLeadersFromCreatorDepartment(Recognition recognition)
+        {
+            // creator s departmentom
+            var creator = await dbContext.EmployeeCards
+                .Include(e => e.User)
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(e => e.Id == recognition.createdBy.Id);
+
+            if (creator == null)
+                return new List<ExtendedIdentityUser>();
+
+            var departmentId = creator.Department.Id;
+
+            // všetci zamestnanci z oddelenia
+            var employees = await dbContext.EmployeeCards
+                .Include(e => e.User)
+                .Where(e => e.Department.Id == departmentId)
+                .ToListAsync();
+
+            var leaders = new List<ExtendedIdentityUser>();
+
+            foreach (var emp in employees)
+            {
+                var roles = await userManager.GetRolesAsync(emp.User);
+
+                if (roles.Contains(RolesDef.Veduci))
+                {
+                    leaders.Add(emp.User);
+                }
+            }
+
+            return leaders
+                .GroupBy(u => u.Id)
+                .Select(g => g.First())
+                .ToList();
+        }
+
 
 
         //**********************************************************************************
@@ -362,6 +484,74 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+        //**********************************************************************************
+        // Vytvorenie uznania
+        //**********************************************************************************
+        [HttpPost("Approve")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> ApproveRecognition([FromBody] RecognitioToApprove data)
+        {
+            var recipientRecord = await dbContext.Set<RecognitionRecipient>()
+                .Include(r => r.EmployeeCard)
+                    .ThenInclude(e => e.User)
+                .Include(r => r.Recognition)
+                .FirstOrDefaultAsync(r => r.Id == data.recipientRecordId);
+
+            if (recipientRecord == null)
+                return BadRequest("Záznam príjemcu neexistuje.");
+
+            // Mapovanie state stringu → enum
+            if (!Enum.TryParse<EnumRecognitionState>(data.state, out var newState))
+                return BadRequest("Neplatný stav.");
+
+            recipientRecord.State = newState;
+            recipientRecord.dovod = data.dovod;
+
+            if (data.odmena.HasValue)
+                recipientRecord.Recognition.Odmena = data.odmena.Value;
+
+            await dbContext.SaveChangesAsync();
+
+            // Notifikácia iba ak je stav schválený
+            if (newState == EnumRecognitionState.Schvalena || newState == EnumRecognitionState.SchvalenaSUpravou)
+            {
+                var user = recipientRecord.EmployeeCard.User;
+                var recognition = recipientRecord.Recognition;
+
+                var notification = new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false,
+                    NotificationType = EnumNotificationType.RecognitionCreated,
+                    ReferencedItemId = recognition.Id,
+                    Message = $"Vaše uznanie bolo schválené: {recognition.Predmet}",
+                    User = user
+                };
+
+                dbContext.Notifications.Add(notification);
+                await dbContext.SaveChangesAsync();
+
+                var response = new NotificationResponse
+                {
+                    Id = notification.Id,
+                    CreatedAt = notification.CreatedAt,
+                    IsRead = notification.IsRead,
+                    Message = notification.Message,
+                    NotificationType = notification.NotificationType,
+                    ReferencedItem = recognition.Id.ToString(),
+                    Title = NotificationHelpers.GetNotificationTitle(notification.NotificationType)
+                };
+
+                await hubContext.Clients.User(user.Id)
+                    .SendAsync("ReceiveNotification", response);
+            }
+
+            return Ok();
+        }
+
+
+
         public class RecognitionRequest
         {
             public required string predmet { get; set; }
@@ -411,5 +601,16 @@ namespace AGILE2024_BE.Controllers
             public Guid Id { get; set; }
             public string FullName { get; set; }
         }
+
+
+        public class RecognitioToApprove
+        {
+            public Guid recipientRecordId { get; set; }
+            public Guid recognitionId { get; set; }
+            public string state { get; set; }
+            public int? odmena { get; set; }
+            public string? dovod { get; set; }
+        }
+
     }
 }
