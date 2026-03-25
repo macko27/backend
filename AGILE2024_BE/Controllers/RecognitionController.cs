@@ -254,7 +254,7 @@ namespace AGILE2024_BE.Controllers
                             Id = Guid.NewGuid(),
                             CreatedAt = DateTime.UtcNow,
                             IsRead = false,
-                            NotificationType = EnumNotificationType.RecognitionCreated,
+                            NotificationType = EnumNotificationType.RecognitionApproval,
                             ReferencedItemId = recognition.Id,
                             Message = $"Uznanie čaká na schválenie: {recognition.Predmet}",
                             User = leader
@@ -513,7 +513,7 @@ namespace AGILE2024_BE.Controllers
             await dbContext.SaveChangesAsync();
 
             // Notifikácia iba ak je stav schválený
-            if (newState == EnumRecognitionState.Schvalena || newState == EnumRecognitionState.SchvalenaSUpravou)
+            if (newState == EnumRecognitionState.Schvalena || newState == EnumRecognitionState.SchvalenaSUpravou || newState == EnumRecognitionState.Zamietnuta)
             {
                 var user = recipientRecord.EmployeeCard.User;
                 var recognition = recipientRecord.Recognition;

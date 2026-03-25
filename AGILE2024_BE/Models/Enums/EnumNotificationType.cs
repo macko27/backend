@@ -12,6 +12,7 @@
         SurveyAssignedNotificationType,
         SurveyCompletedNotificationType,
         SurveyExpiredNotificationType,
-        RecognitionCreated
+        RecognitionCreated,
+        RecognitionApproval
     }
 }
