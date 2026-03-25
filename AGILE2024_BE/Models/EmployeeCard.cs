@@ -29,5 +29,6 @@ namespace AGILE2024_BE.Models
         public required DateTime LastEdited { get; set; } = DateTime.Now;
         public required DateTime Created { get; set; } = DateTime.Now;
         public required bool Archived { get; set; } = false;
+        public int PointsBalance { get; set; } = 0;
     }
 }

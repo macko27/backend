@@ -232,6 +232,18 @@ namespace AGILE2024_BE.Controllers
                 foreach (var recipient in recognition.Recipients)
                 {
                     recipient.State = await GetInitialStateForRecipient(recognition, recipient);
+
+                    //udelenie bodov
+                    if (recipient.State == EnumRecognitionState.Schvalena || recipient.State == EnumRecognitionState.SchvalenaSUpravou)
+                    {
+                        var employeeCard = await dbContext.EmployeeCards
+                            .FirstOrDefaultAsync(e => e.Id == recipient.EmployeeCardId);
+
+                        if (employeeCard != null)
+                        {
+                            employeeCard.PointsBalance += recognition.Odmena;
+                        }
+                    }
                 }
 
                 dbContext.Recognitions.Add(recognition);
@@ -247,7 +259,7 @@ namespace AGILE2024_BE.Controllers
 
                 if (hasPending)
                 {
-                    var leaders = await GetLeadersFromCreatorDepartment(recognition);
+                    var leaders = await GetLeadersFromRecipientDepartments(recognition);
 
                     foreach (var leader in leaders)
                     {
@@ -415,7 +427,7 @@ namespace AGILE2024_BE.Controllers
                 .Where(a => a.RecognitionId == recognitionId)
                 .Select(a => new
                 {
-                    id = a.Id,           // 👈 kľúčové
+                    id = a.Id,
                     fileName = a.FileName
                 })
                 .ToListAsync();
@@ -506,34 +518,42 @@ namespace AGILE2024_BE.Controllers
         //**********************************************************************************
         // Ziskanie vsetkych veducich pre toho co to vytvoril pre oddelenie
         //**********************************************************************************
-        private async Task<List<ExtendedIdentityUser>> GetLeadersFromCreatorDepartment(Recognition recognition)
+        private async Task<List<ExtendedIdentityUser>> GetLeadersFromRecipientDepartments(Recognition recognition)
         {
-            // creator s departmentom
-            var creator = await dbContext.EmployeeCards
-                .Include(e => e.User)
-                .Include(e => e.Department)
-                .FirstOrDefaultAsync(e => e.Id == recognition.createdBy.Id);
+            // Všetci pending recipienti
+            var pendingRecipients = recognition.Recipients
+                .Where(r => r.State == EnumRecognitionState.Cakajuca)
+                .ToList();
 
-            if (creator == null)
-                return new List<ExtendedIdentityUser>();
-
-            var departmentId = creator.Department.Id;
-
-            // všetci zamestnanci z oddelenia
-            var employees = await dbContext.EmployeeCards
-                .Include(e => e.User)
-                .Where(e => e.Department.Id == departmentId)
-                .ToListAsync();
+            foreach (var r in pendingRecipients)
+            {
+                if (r.EmployeeCard == null)
+                {
+                    r.EmployeeCard = await dbContext.EmployeeCards
+                        .Include(e => e.Department)
+                        .Include(e => e.User)
+                        .FirstOrDefaultAsync(e => e.Id == r.EmployeeCardId);
+                }
+            }
 
             var leaders = new List<ExtendedIdentityUser>();
 
-            foreach (var emp in employees)
-            {
-                var roles = await userManager.GetRolesAsync(emp.User);
+            var groupedByDepartment = pendingRecipients.GroupBy(r => r.EmployeeCard.Department.Id);
 
-                if (roles.Contains(RolesDef.Veduci))
+            foreach (var group in groupedByDepartment)
+            {
+                var departmentId = group.Key;
+
+                var employeesInDept = await dbContext.EmployeeCards
+                    .Include(e => e.User)
+                    .Where(e => e.Department.Id == departmentId)
+                    .ToListAsync();
+
+                foreach (var emp in employeesInDept)
                 {
-                    leaders.Add(emp.User);
+                    var roles = await userManager.GetRolesAsync(emp.User);
+                    if (roles.Contains(RolesDef.Veduci))
+                        leaders.Add(emp.User);
                 }
             }
 
@@ -627,6 +647,10 @@ namespace AGILE2024_BE.Controllers
             if (recipientRecord == null)
                 return BadRequest("Záznam príjemcu neexistuje.");
 
+            //schvalovat sa moze iba cakajuca odmena
+            if (recipientRecord.State != EnumRecognitionState.Cakajuca)
+                return BadRequest("Uznanie už bolo schválené alebo zamietnuté, odmena sa nedá meniť.");
+
             // Mapovanie state stringu → enum
             if (!Enum.TryParse<EnumRecognitionState>(data.state, out var newState))
                 return BadRequest("Neplatný stav.");
@@ -672,6 +696,21 @@ namespace AGILE2024_BE.Controllers
 
                 await hubContext.Clients.User(user.Id)
                     .SendAsync("ReceiveNotification", response);
+            }
+
+
+            //pripocitanie bodov
+            if ((newState == EnumRecognitionState.Schvalena || newState == EnumRecognitionState.SchvalenaSUpravou))
+            {
+                var employeeCard = await dbContext.EmployeeCards
+                    .FirstOrDefaultAsync(e => e.Id == recipientRecord.EmployeeCardId);
+
+                if (employeeCard != null && recipientRecord.Recognition != null)
+                {
+                    employeeCard.PointsBalance += recipientRecord.Recognition.Odmena;
+                }
+
+                await dbContext.SaveChangesAsync();
             }
 
             return Ok();

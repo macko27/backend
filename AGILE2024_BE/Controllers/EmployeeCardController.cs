@@ -62,6 +62,7 @@ namespace AGILE2024_BE.Controllers
             employeeCard.Level = level;
             employeeCard.StartWorkDate = DateTime.Parse(employeeCardRequest.StartWorkDate);
             employeeCard.LastEdited = DateTime.Now;
+            employeeCard.PointsBalance = employeeCardRequest.points;
 
             dbContext.EmployeeCards.Update(employeeCard);
 

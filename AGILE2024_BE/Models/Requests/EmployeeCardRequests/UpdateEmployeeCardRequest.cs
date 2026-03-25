@@ -12,5 +12,6 @@
         public int WorkTime { get; set; }
         public string UserId {get; set;}
         public string StartWorkDate { get; set; }
+        public int points { get; set; }
     }
 }
