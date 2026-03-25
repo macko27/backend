@@ -10,6 +10,8 @@ using AGILE2024_BE.Models.Recognition;
 using AGILE2024_BE.Models;
 using AGILE2024_BE.Services;
 using Microsoft.IdentityModel.Tokens;
+using Azure.Storage.Blobs;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -325,6 +327,131 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+        //**********************************************************************************
+        // Vytvorenie uznania s prilohami
+        //**********************************************************************************
+        [HttpPost("CreateWithFiles")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> CreateRecognitionWithFiles([FromForm] RecognitionWithFilesRequest data)
+        {
+            if (data == null)
+                return BadRequest("Neplatné dáta");
+
+            // 1️⃣ Vytvor uznanie (bez príloh) - použijeme logiku z CreateRecognition
+            var recognitionRequest = new RecognitionRequest
+            {
+                predmet = data.predmet,
+                text = data.text,
+                odmena = data.odmena,
+                createdById = data.createdById,
+                recipients = data.recipients.Select(r => new RecognitionRecipientRequest { id = r }).ToList()
+            };
+
+            // Zavoláme existujúcu logiku
+            IActionResult createResult = await CreateRecognition(recognitionRequest);
+            if (createResult is not OkObjectResult okResult)
+                return createResult;
+
+
+            //ukladanie suborov
+            Guid recognitionId = ((dynamic)okResult.Value).id;
+            var recognition = await dbContext.Recognitions
+                .Include(r => r.Recipients)
+                .FirstOrDefaultAsync(r => r.Id == recognitionId);
+
+            if (recognition == null)
+                return StatusCode(500, "Chyba pri načítaní vytvoreného uznania.");
+
+
+            if (data.files != null && data.files.Count > 0)
+            {
+                if (data.files.Count > 3)
+                    return BadRequest("Maximálne 3 prílohy.");
+
+                BlobServiceClient client = new(config.GetSection("Blob")["BlobConnect"]);
+                var container = client.GetBlobContainerClient("recognition-files");
+
+
+                foreach (var file in data.files)
+                {
+                    if (file.Length > 10 * 1024 * 1024)
+                        return BadRequest($"Súbor {file.FileName} je väčší ako 10MB.");
+
+                    var fileName = $"{Guid.NewGuid()}.{file.FileName.Split('.').Last()}";
+                    var blobClient = container.GetBlobClient(fileName);
+
+                    await blobClient.UploadAsync(file.OpenReadStream(), true);
+
+                    //ak su attachments null nastavime novy list
+
+                    var attachment = new RecognitionAttachment
+                    {
+                        FileName = file.FileName,
+                        FileUrl = blobClient.Uri.ToString(),
+                        RecognitionId = recognition.Id
+                    };
+
+                    dbContext.RecognitionAttachment.Add(attachment);
+                }
+
+                //dbContext.RecognitionAttachments.AddRange(attachments);
+                await dbContext.SaveChangesAsync();
+            }
+
+            return Ok(new { id = recognition.Id });
+        
+        }
+
+
+
+        //**********************************************************************************
+        // ziskanie priloh 
+        //**********************************************************************************
+        [HttpGet("GetAttachments/{recognitionId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> GetAttachments(Guid recognitionId)
+        {
+            var attachments = await dbContext.RecognitionAttachment
+                .Where(a => a.RecognitionId == recognitionId)
+                .Select(a => new
+                {
+                    id = a.Id,           // 👈 kľúčové
+                    fileName = a.FileName
+                })
+                .ToListAsync();
+
+            return Ok(attachments);
+        }
+
+
+
+        //**********************************************************************************
+        // stiahnutie priloh 
+        //**********************************************************************************
+        [HttpGet("DownloadAttachment/{attachmentId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> DownloadAttachment(Guid attachmentId)
+        {
+            var attachment = await dbContext.RecognitionAttachment
+                .FirstOrDefaultAsync(a => a.Id == attachmentId);
+
+            if (attachment == null)
+                return NotFound("Príloha neexistuje.");
+
+            BlobServiceClient blobServiceClient = new(config.GetSection("Blob")["BlobConnect"]);
+            var container = blobServiceClient.GetBlobContainerClient("recognition-files");
+
+            var blobName = new Uri(attachment.FileUrl).Segments.Last();
+            var blobClient = container.GetBlobClient(blobName);
+
+            if (!await blobClient.ExistsAsync())
+                return NotFound("Súbor neexistuje v úložisku.");
+
+            var stream = await blobClient.OpenReadAsync();
+
+            return File(stream, "application/octet-stream", attachment.FileName);
+        }
+
 
         //**********************************************************************************
         // Nastavenie stavu uznania podla role
@@ -610,6 +737,20 @@ namespace AGILE2024_BE.Controllers
             public string state { get; set; }
             public int? odmena { get; set; }
             public string? dovod { get; set; }
+        }
+
+
+
+        public class RecognitionWithFilesRequest
+        {
+            public string predmet { get; set; }
+            public string text { get; set; }
+            public int odmena { get; set; }
+            public Guid createdById { get; set; }
+
+            public List<Guid> recipients { get; set; } = new();
+
+            public List<IFormFile>? files { get; set; }
         }
 
     }

@@ -1,6 +1,7 @@
 ﻿using AGILE2024_BE.Models.Enums;
 using AGILE2024_BE.Models.Survey;
 using System.ComponentModel.DataAnnotations.Schema;
+using static AGILE2024_BE.Controllers.RecognitionController;
 
 namespace AGILE2024_BE.Models.Recognition
 {
@@ -16,5 +17,6 @@ namespace AGILE2024_BE.Models.Recognition
         public required EmployeeCard createdBy { get; set; }
         public required DateTime DateIn { get; set; } = DateTime.UtcNow;
         public ICollection<RecognitionRecipient>? Recipients { get; set; } = new List<RecognitionRecipient>();
+        public ICollection<RecognitionAttachment> Attachments { get; set; } = new List<RecognitionAttachment>();
     }
 }
