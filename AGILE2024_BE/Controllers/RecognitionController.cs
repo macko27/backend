@@ -41,6 +41,7 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetRecieved/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> GetRecievedRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -69,10 +70,13 @@ namespace AGILE2024_BE.Controllers
                         fullName = r.createdBy.User.Name + " " + r.createdBy.User.Surname
                     },
 
-                    myState = r.Recipients
+                    recipients = r.Recipients
                         .Where(rec => rec.EmployeeCardId == employeeId)
-                        .Select(rec => rec.State)
-                        .FirstOrDefault(),
+                        .Select(rec => new
+                        {
+                            id = rec.EmployeeCardId,
+                            state = rec.State
+                        })
 
                 })
                 .OrderByDescending(r => r.DateIn)
@@ -88,6 +92,7 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetSent/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> GetSentRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -112,7 +117,6 @@ namespace AGILE2024_BE.Controllers
                         fullName = r.createdBy.User.Name + " " + r.createdBy.User.Surname
                     },
 
-                    // 🔥 KAŽDÝ RECIPIENT MÁ VLASTNÝ STATE
                     recipients = r.Recipients.Select(q => new
                     {
                         id = q.EmployeeCardId,
@@ -133,6 +137,7 @@ namespace AGILE2024_BE.Controllers
         // veduci z oddelenia z ktoreho je createdBy to schvaluje
         //**********************************************************************************
         [HttpGet("GetToBeApproved/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> GetToBeApproved(Guid employeeId)
         {
             var employee = await dbContext.EmployeeCards
@@ -597,7 +602,7 @@ namespace AGILE2024_BE.Controllers
         // Vyhľadávanie zamestnancov
         //**********************************************************************************
         [HttpGet("SearchRecipients")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
         public async Task<IActionResult> SearchRecipients([FromQuery] string query)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -716,6 +721,23 @@ namespace AGILE2024_BE.Controllers
             return Ok();
         }
 
+
+
+        //**********************************************************************************
+        // Ziskanie stavu bodov pre pouzivatela
+        //**********************************************************************************
+        [HttpGet("GetPointsBalance/{employeeId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> GetPointsBalance(Guid employeeId)
+        {
+            var employee = await dbContext.EmployeeCards
+                .FirstOrDefaultAsync(ec => ec.Id == employeeId);
+
+            if (employee is null)
+                return BadRequest("EmployeeCard neexistuje.");
+
+            return Ok(employee.PointsBalance);
+        }
 
 
         public class RecognitionRequest
