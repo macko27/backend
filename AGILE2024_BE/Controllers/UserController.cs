@@ -224,5 +224,43 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+        [HttpPost("ChangePassword")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            if (request.NewPassword != request.ConfirmNewPassword)
+            {
+                return BadRequest("Nové heslá sa nezhodujú");
+            }
+
+            var user = await userManager.FindByEmailAsync(User.Identity?.Name!);
+
+            if (user == null)
+            {
+                return NotFound("Používateľ neexistuje");
+            }
+
+            var result = await userManager.ChangePasswordAsync(
+                user,
+                request.CurrentPassword,
+                request.NewPassword
+            );
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors);
+            }
+
+            return Ok("Heslo bolo úspešne zmenené");
+        }
+
+
+        public class ChangePasswordRequest
+        {
+            public string ConfirmNewPassword { get; set; } = "";
+            public string CurrentPassword { get; set; } = "";
+            public string NewPassword { get; set; } = "";
+        }
+
     }
 }

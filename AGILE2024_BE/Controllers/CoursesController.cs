@@ -272,7 +272,21 @@ namespace AGILE2024_BE.Controllers
                 return NotFound("Course type not found.");
             }
 
-            var date = DateTime.Parse(createCourse.ExpirationDate);
+            DateTime? date = null;
+
+            if (!string.IsNullOrWhiteSpace(createCourse.ExpirationDate))
+            {
+                if (!DateTime.TryParse(createCourse.ExpirationDate, out var parsedDate))
+                {
+                    return BadRequest(new { message = "Neplatný formát dátumu" });
+                }
+                date = parsedDate;
+            }
+            else
+            {
+                return BadRequest(new { message = "Chýba dátum expirácie" });
+            }
+
             if (date < DateTime.UtcNow)
             {
                 return BadRequest(new { message = "Dátum expirácie nesmie byť v minulosit" });
@@ -284,7 +298,7 @@ namespace AGILE2024_BE.Controllers
                 CreatedEmployee = createdEmployee,
                 Type = courseType,
                 Version = createCourse.Version,
-                ExpirationDate = DateOnly.FromDateTime(date) // Explicitly convert DateTime to DateOnly
+                ExpirationDate = DateOnly.FromDateTime(date.Value)
             };
             dbContext.Courses.Add(course);
             var courseState = await dbContext.CourseStates
