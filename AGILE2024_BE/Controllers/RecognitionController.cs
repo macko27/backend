@@ -631,13 +631,10 @@ namespace AGILE2024_BE.Controllers
 
             foreach (var r in pendingRecipients)
             {
-                if (r.EmployeeCard == null)
-                {
-                    r.EmployeeCard = await dbContext.EmployeeCards
+                r.EmployeeCard = await dbContext.EmployeeCards
                         .Include(e => e.Department)
                         .Include(e => e.User)
                         .FirstOrDefaultAsync(e => e.Id == r.EmployeeCardId);
-                }
             }
 
             var leaders = new List<ExtendedIdentityUser>();
