@@ -78,6 +78,7 @@ namespace AGILE2024_BE.Data
         public DbSet<Recognition> Recognitions { get; set; }
         public DbSet<RecognitionRecipient> RecognitionRecipients { get; set; }
         public DbSet<RecognitionAttachment> RecognitionAttachment { get; set; }
+        public DbSet<PointsTransaction> PointsTransactions { get; set; }
         #endregion
     }
 }

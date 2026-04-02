@@ -36,6 +36,49 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+
+        [HttpGet("GetDetail/{recognitionId}")]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        public async Task<IActionResult> GetRecognitionDetail(Guid recognitionId)
+        {
+            var recognition = await dbContext.Recognitions
+                .Include(r => r.createdBy)
+                    .ThenInclude(cr => cr.User)
+                .Include(r => r.Recipients)
+                    .ThenInclude(rec => rec.EmployeeCard)
+                        .ThenInclude(ec => ec.User)
+                .Include(r => r.Attachments)
+                .FirstOrDefaultAsync(r => r.Id == recognitionId);
+
+            if (recognition == null)
+                return NotFound("Uznanie neexistuje.");
+
+            var response = new RecognitionResponseDto
+            {
+                Id = recognition.Id,
+                Predmet = recognition.Predmet,
+                Text = recognition.Text,
+                DateIn = recognition.DateIn,
+                Odmena = recognition.Odmena.ToString(),
+                CreatedBy = new UserDto
+                {
+                    Id = recognition.createdBy.Id,
+                    FullName = recognition.createdBy.User.Name + " " + recognition.createdBy.User.Surname
+                },
+                Recipients = recognition.Recipients.Select(r => new UserDto
+                {
+                    Id = r.EmployeeCardId,
+                    FullName = r.EmployeeCard.User.Name + " " + r.EmployeeCard.User.Surname
+                }).ToList(),
+                state = recognition.Recipients.FirstOrDefault()?.State ?? EnumRecognitionState.Cakajuca
+            };
+
+            return Ok(response);
+        }
+
+
+
+
         //**********************************************************************************
         // Ziskanie uznani pre daneho pouzivatela
         // Zoznam uznani
@@ -306,6 +349,17 @@ namespace AGILE2024_BE.Controllers
                         if (employeeCard != null)
                         {
                             employeeCard.PointsBalance += recognition.Odmena;
+
+                            dbContext.PointsTransactions.Add(new PointsTransaction
+                            {
+                                Id = Guid.NewGuid(),
+                                EmployeeCardId = employeeCard.Id,
+                                Points = recognition.Odmena,
+                                Type = "Uznanie",
+                                Description = $"Uznanie: {recognition.Predmet}",
+                                CreatedAt = DateTime.UtcNow,
+                                RecognitionId = recognition.Id
+                            });
                         }
                     }
                 }
@@ -806,15 +860,51 @@ namespace AGILE2024_BE.Controllers
                 var employeeCard = await dbContext.EmployeeCards
                     .FirstOrDefaultAsync(e => e.Id == recipientRecord.EmployeeCardId);
 
+                var points = recipientRecord.Recognition.Odmena;
+
                 if (employeeCard != null && recipientRecord.Recognition != null)
                 {
-                    employeeCard.PointsBalance += recipientRecord.Recognition.Odmena;
+                    employeeCard.PointsBalance += points;
+                    dbContext.PointsTransactions.Add(new PointsTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        EmployeeCardId = employeeCard.Id,
+                        Points = points,
+                        Type = "Uznanie",
+                        Description = $"Uznanie: {recipientRecord.Recognition.Predmet}",
+                        CreatedAt = DateTime.UtcNow,
+                        RecognitionId = recipientRecord.Recognition.Id
+                    });
                 }
 
                 await dbContext.SaveChangesAsync();
             }
 
             return Ok();
+        }
+
+
+        //**********************************************************************************
+        // Historia bodov
+        //**********************************************************************************
+        [HttpGet("GetPointsHistory/{employeeId}")]
+        public async Task<IActionResult> GetPointsHistory(Guid employeeId)
+        {
+            var data = await dbContext.PointsTransactions
+                .Where(p => p.EmployeeCardId == employeeId)
+                .OrderByDescending(p => p.CreatedAt)
+                .Select(p => new
+                {
+                    id = p.Id,
+                    date = p.CreatedAt,
+                    points = p.Points,
+                    type = p.Type,
+                    description = p.Description,
+                    recognitionId = p.RecognitionId
+                })
+                .ToListAsync();
+
+            return Ok(data);
         }
 
 

@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Reflection.Emit;
+using AGILE2024_BE.Models.Recognition;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -62,7 +63,26 @@ namespace AGILE2024_BE.Controllers
             employeeCard.Level = level;
             employeeCard.StartWorkDate = DateTime.Parse(employeeCardRequest.StartWorkDate);
             employeeCard.LastEdited = DateTime.Now;
-            employeeCard.PointsBalance = employeeCardRequest.points;
+
+            var oldPoints = employeeCard.PointsBalance;
+            var newPoints = employeeCardRequest.points;
+
+            var rozdiel = newPoints - oldPoints;
+
+            employeeCard.PointsBalance = newPoints;
+
+            if (rozdiel != 0)
+            {
+                dbContext.PointsTransactions.Add(new PointsTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    EmployeeCardId = employeeCard.Id,
+                    Points = rozdiel,
+                    Type = "ADJUSTMENT",
+                    Description = $"Manuálna úprava bodov adminom ({oldPoints} → {newPoints})",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             dbContext.EmployeeCards.Update(employeeCard);
 
