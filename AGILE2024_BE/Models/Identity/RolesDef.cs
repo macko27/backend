@@ -6,5 +6,6 @@
         public const string Zamestnanec = "Zamestnanec";
         public const string PowerUser = "Výkonný používateľ (Power User)";
         public const string Veduci = "Vedúci zamestnanec";
+        public const string ShopAdmin = "Shop Admin";
     }
 }

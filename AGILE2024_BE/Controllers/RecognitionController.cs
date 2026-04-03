@@ -913,7 +913,7 @@ namespace AGILE2024_BE.Controllers
         // Ziskanie stavu bodov pre pouzivatela
         //**********************************************************************************
         [HttpGet("GetPointsBalance/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetPointsBalance(Guid employeeId)
         {
             var employee = await dbContext.EmployeeCards
