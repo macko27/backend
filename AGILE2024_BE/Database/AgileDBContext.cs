@@ -4,6 +4,7 @@ using AGILE2024_BE.Models.Entity.Courses;
 using AGILE2024_BE.Models.Entity.SuccessionPlan;
 using AGILE2024_BE.Models.Identity;
 using AGILE2024_BE.Models.Recognition;
+using AGILE2024_BE.Models.Shop;
 using AGILE2024_BE.Models.Survey;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -79,6 +80,11 @@ namespace AGILE2024_BE.Data
         public DbSet<RecognitionRecipient> RecognitionRecipients { get; set; }
         public DbSet<RecognitionAttachment> RecognitionAttachment { get; set; }
         public DbSet<PointsTransaction> PointsTransactions { get; set; }
+
+        //shop
+        public DbSet<ShopCategory> ShopCategories { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<ProductAttachment> ProductAttachments { get; set; }
         #endregion
     }
 }
