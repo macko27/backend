@@ -30,7 +30,7 @@ namespace AGILE2024_BE.Controllers
         }
 
         [HttpGet("Departments")]
-        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> Departments()
         {
             var departments = await dbContext.Departments
@@ -494,7 +494,7 @@ namespace AGILE2024_BE.Controllers
         }
 
         [HttpGet("DepartmentsWithEmployeeCount")]
-        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetDepartmentsWithEmployeeCount()
         {
             try

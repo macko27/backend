@@ -74,7 +74,7 @@ namespace AGILE2024_BE.Controllers
 
 
         [HttpGet("GetMyAdaptation")]
-        [Authorize(Roles = RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetMyAdaptation()
         {
             try

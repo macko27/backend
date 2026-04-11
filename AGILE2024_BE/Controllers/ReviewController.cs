@@ -343,7 +343,7 @@ namespace AGILE2024_BE.Controllers
         }
 
         [HttpGet("MyReviews")]
-        [Authorize(Roles = RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetEmployeeReviews()
         {
             ExtendedIdentityUser? user = await userManager.FindByEmailAsync(User.Identity?.Name!);

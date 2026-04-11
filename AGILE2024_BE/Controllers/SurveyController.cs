@@ -36,7 +36,7 @@ namespace AGILE2024_BE.Controllers
         // Vytvorenie ankety
         //**********************************************************************************
         [HttpPost("Create")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> CreateSurvey([FromBody] SurveyRequest data)
         {
 
@@ -191,7 +191,7 @@ namespace AGILE2024_BE.Controllers
         // Zoznam ankiet
         //**********************************************************************************
         [HttpGet("GetByEmployee/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetSurveysByEmployee(Guid employeeId)
         {
             var employeeCard = await dbContext.EmployeeCards
@@ -241,7 +241,7 @@ namespace AGILE2024_BE.Controllers
         // Moje ankety
         //**********************************************************************************
         [HttpGet("GetMySurveys/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetMySurveys(Guid employeeId)
         {
             var employee = await dbContext.EmployeeCards
@@ -261,7 +261,7 @@ namespace AGILE2024_BE.Controllers
         // Vysledky ankety
         //**********************************************************************************
         [HttpGet("GetMyEndedSurveys/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetMyEndedSurveys(Guid employeeId)
         {
             var employee = await dbContext.EmployeeCards
@@ -316,7 +316,7 @@ namespace AGILE2024_BE.Controllers
         // Vyhľadávanie zamestnancov / oddelení pre výber príjemcov
         //**********************************************************************************
         [HttpGet("SearchRecipients")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> SearchRecipients([FromQuery] string query)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -381,7 +381,7 @@ namespace AGILE2024_BE.Controllers
         // Vysledky ankety podľa ID
         //**********************************************************************************
         [HttpGet("GetResult/{surveyId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetSurveyResult(Guid surveyId)
         {
             var survey = await dbContext.Surveys
@@ -473,7 +473,7 @@ namespace AGILE2024_BE.Controllers
         // Detail ankety podľa ID
         //**********************************************************************************
         [HttpGet("GetDetail/{surveyId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetSurveyDetail(Guid surveyId)
         {
             var survey = await dbContext.Surveys
@@ -568,7 +568,7 @@ namespace AGILE2024_BE.Controllers
         // Detail ankety podľa ID
         //**********************************************************************************
         [HttpDelete("{surveyId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> DeleteSurvey(Guid surveyId)
         {
             var survey = await dbContext.Surveys
@@ -641,7 +641,7 @@ namespace AGILE2024_BE.Controllers
         // Odoslanie hlasovania používateľa
         //**********************************************************************************
         [HttpPost("SubmitVote/{surveyId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> SubmitVote(Guid surveyId, [FromBody] VoteRequest data)
         {
             var userId = this.userManager.GetUserId(User);
@@ -774,7 +774,7 @@ namespace AGILE2024_BE.Controllers
         // Ziskanie odpovedi ak uz som hlasoval
         //**********************************************************************************
         [HttpPost("GetVotes/{surveyId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetVotes(Guid surveyId)
         {
             var userId = this.userManager.GetUserId(User);

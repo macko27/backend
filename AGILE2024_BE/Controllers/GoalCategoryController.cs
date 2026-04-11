@@ -29,7 +29,7 @@ namespace AGILE2024_BE.Controllers
         }
 
         [HttpGet("Categories")]
-        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> Categories()
         {
             var categories = await dbContext.GoalCategory.ToListAsync();

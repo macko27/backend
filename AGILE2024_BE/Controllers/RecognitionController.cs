@@ -38,7 +38,7 @@ namespace AGILE2024_BE.Controllers
 
 
         [HttpGet("GetDetail/{recognitionId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetRecognitionDetail(Guid recognitionId)
         {
             var recognition = await dbContext.Recognitions
@@ -84,7 +84,7 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetRecieved/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetRecievedRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -135,7 +135,7 @@ namespace AGILE2024_BE.Controllers
         // Zoznam uznani
         //**********************************************************************************
         [HttpGet("GetSent/{employeeId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetSentRecognitions(Guid employeeId)
         {
             var exists = await dbContext.EmployeeCards
@@ -304,7 +304,7 @@ namespace AGILE2024_BE.Controllers
         // Vytvorenie uznania
         //**********************************************************************************
         [HttpPost("Create")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> CreateRecognition([FromBody] RecognitionRequest data)
         {
             if (data == null)
@@ -356,7 +356,7 @@ namespace AGILE2024_BE.Controllers
                                 EmployeeCardId = employeeCard.Id,
                                 Points = recognition.Odmena,
                                 Type = "Uznanie",
-                                Description = $"Uznanie: {recognition.Predmet}",
+                                Description = $"{recognition.Predmet}",
                                 CreatedAt = DateTime.UtcNow,
                                 RecognitionId = recognition.Id
                             });
@@ -461,7 +461,7 @@ namespace AGILE2024_BE.Controllers
         // Vytvorenie uznania s prilohami
         //**********************************************************************************
         [HttpPost("CreateWithFiles")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> CreateRecognitionWithFiles([FromForm] RecognitionWithFilesRequest data)
         {
             if (data == null)
@@ -538,7 +538,7 @@ namespace AGILE2024_BE.Controllers
         // ziskanie priloh 
         //**********************************************************************************
         [HttpGet("GetAttachments/{recognitionId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> GetAttachments(Guid recognitionId)
         {
             var attachments = await dbContext.RecognitionAttachment
@@ -559,7 +559,7 @@ namespace AGILE2024_BE.Controllers
         // stiahnutie priloh 
         //**********************************************************************************
         [HttpGet("DownloadAttachment/{attachmentId}")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> DownloadAttachment(Guid attachmentId)
         {
             var attachment = await dbContext.RecognitionAttachment
@@ -752,7 +752,7 @@ namespace AGILE2024_BE.Controllers
         // Vyhľadávanie zamestnancov
         //**********************************************************************************
         [HttpGet("SearchRecipients")]
-        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca)]
+        [Authorize(Roles = RolesDef.Veduci + "," + RolesDef.Zamestnanec + "," + RolesDef.Spravca + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> SearchRecipients([FromQuery] string query)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -871,7 +871,7 @@ namespace AGILE2024_BE.Controllers
                         EmployeeCardId = employeeCard.Id,
                         Points = points,
                         Type = "Uznanie",
-                        Description = $"Uznanie: {recipientRecord.Recognition.Predmet}",
+                        Description = $"{recipientRecord.Recognition.Predmet}",
                         CreatedAt = DateTime.UtcNow,
                         RecognitionId = recipientRecord.Recognition.Id
                     });

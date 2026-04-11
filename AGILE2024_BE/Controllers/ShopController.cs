@@ -144,6 +144,45 @@ namespace AGILE2024_BE.Controllers
 
 
         //******************************
+        // Získanie produktu
+        //******************************
+        [HttpGet("Get/{id}")]
+        public async Task<IActionResult> GetProduct(Guid id)
+        {
+            var product = await dbContext.Products
+                .Include(p => p.ShopCategory)
+                .Include(p => p.ProductAttachment)
+                .Where(p => p.Id == id)
+                .Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    info = p.Info,
+                    price = p.Price,
+                    shopCategory = new
+                    {
+                        id = p.ShopCategory.Id,
+                        name = p.ShopCategory.Name
+                    },
+                    productAttachment = p.ProductAttachment != null ? new
+                    {
+                        fileName = p.ProductAttachment.FileName,
+                        fileUrl = p.ProductAttachment.FileUrl
+                    } : null
+                })
+                .FirstOrDefaultAsync();
+
+            if (product == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(product);
+        }
+
+
+
+        //******************************
         // Odstránenie produktu
         //******************************
         [HttpDelete("Delete/{id}")]

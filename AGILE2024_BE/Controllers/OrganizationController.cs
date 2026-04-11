@@ -40,7 +40,7 @@ namespace AGILE2024_BE.Controllers
             return Ok(organizations);
         }
         [HttpGet("Organizations")]
-        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec)]
+        [Authorize(Roles = RolesDef.Spravca + ", " + RolesDef.Veduci + ", " + RolesDef.Zamestnanec + "," + RolesDef.ShopAdmin)]
         public async Task<IActionResult> Organizations()
         {
             try
