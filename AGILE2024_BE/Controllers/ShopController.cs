@@ -113,11 +113,16 @@ namespace AGILE2024_BE.Controllers
         // Získanie všetkých produktov
         //******************************
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAllProducts()
+        public async Task<IActionResult> GetAllProducts(int page = 0, int size = 12)
         {
-            var products = await dbContext.Products
+            var query = dbContext.Products
                 .Include(p => p.ShopCategory)
                 .Include(p => p.ProductAttachment)
+                .AsQueryable();
+
+            var products = await query
+                .Skip(page * size)
+                .Take(size)
                 .Select(p => new
                 {
                     id = p.Id,
