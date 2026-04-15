@@ -72,6 +72,7 @@ namespace AGILE2024_BE.Controllers
             product.Info = data.info;
             product.Price = data.price;
             product.ShopCategory = await dbContext.ShopCategories.FirstOrDefaultAsync(c => c.Id == data.shopCategoryId);
+            product.AnoPlatny = true;
 
             // súbor (ak je nový)
             if (data.file != null)
@@ -109,6 +110,7 @@ namespace AGILE2024_BE.Controllers
         }
 
 
+
         //******************************
         // Získanie všetkých produktov
         //******************************
@@ -118,6 +120,7 @@ namespace AGILE2024_BE.Controllers
             var query = dbContext.Products
                 .Include(p => p.ShopCategory)
                 .Include(p => p.ProductAttachment)
+                .Where(p => p.AnoPlatny == true)
                 .AsQueryable();
 
             var products = await query
@@ -157,7 +160,7 @@ namespace AGILE2024_BE.Controllers
             var product = await dbContext.Products
                 .Include(p => p.ShopCategory)
                 .Include(p => p.ProductAttachment)
-                .Where(p => p.Id == id)
+                .Where(p => p.Id == id && p.AnoPlatny == true)
                 .Select(p => new
                 {
                     id = p.Id,
@@ -195,36 +198,17 @@ namespace AGILE2024_BE.Controllers
         public async Task<IActionResult> DeleteProduct(Guid id)
         {
             var product = await dbContext.Products
-                .Include(p => p.ProductAttachment)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (product == null)
                 return NotFound("Produkt nebol nájdený");
 
-            // Odstránenie attachmentu zo storage, ak existuje
-            if (product.ProductAttachment != null)
-            {
-                try
-                {
-                    BlobServiceClient client = new(config.GetSection("Blob")["BlobConnect"]);
-                    var container = client.GetBlobContainerClient("product");
-                    var blobClient = container.GetBlobClient(new Uri(product.ProductAttachment.FileUrl).Segments.Last());
-                    await blobClient.DeleteIfExistsAsync();
+            product.AnoPlatny = false;
 
-                    dbContext.ProductAttachments.Remove(product.ProductAttachment);
-                }
-                catch
-                {
-                    // Môžeš logovať chybu, ale necháme pokračovať
-                }
-            }
-
-            dbContext.Products.Remove(product);
             await dbContext.SaveChangesAsync();
 
-            return Ok("Produkt bol odstránený");
+            return Ok("Produkt bol deaktivovaný");
         }
-
 
 
         //******************************
@@ -288,6 +272,29 @@ namespace AGILE2024_BE.Controllers
             await dbContext.SaveChangesAsync();
 
             return Ok("Kategória bola odstránená");
+        }
+
+
+        //*****************************************************
+        // Update kategorie
+        //*****************************************************
+        [HttpPost("UpdateCategory/{id}")]
+        [Authorize(Roles = RolesDef.ShopAdmin)]
+        public async Task<IActionResult> UpdateCategory(Guid id, [FromBody] CreateCategoryRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                return BadRequest("Názov kategórie nemôže byť prázdny");
+
+            var category = await dbContext.ShopCategories.FirstOrDefaultAsync(x => x.Id == id);
+
+            if (category == null)
+                return NotFound("Kategória neexistuje");
+
+            category.Name = request.Name;
+
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new { id = category.Id, name = category.Name });
         }
     }
 
