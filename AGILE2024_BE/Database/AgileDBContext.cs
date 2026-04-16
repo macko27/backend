@@ -85,6 +85,8 @@ namespace AGILE2024_BE.Data
         public DbSet<ShopCategory> ShopCategories { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductAttachment> ProductAttachments { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
         #endregion
     }
 }

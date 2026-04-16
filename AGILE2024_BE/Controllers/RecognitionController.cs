@@ -272,7 +272,7 @@ namespace AGILE2024_BE.Controllers
 
             var teamMembers = await dbContext.EmployeeCards
                 .Include(e => e.User)
-                .Where(e => e.Department.Id == departmentId)
+                .Where(e => e.Department.Id == departmentId && e.Id != employeeId)
                 .Select(e => new
                 {
                     id = e.Id,

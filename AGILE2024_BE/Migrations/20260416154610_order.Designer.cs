@@ -4,6 +4,7 @@ using AGILE2024_BE.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AGILE2024_BE.Migrations
 {
     [DbContext(typeof(AgileDBContext))]
-    partial class AgileDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260416154610_order")]
+    partial class order
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1198,9 +1201,6 @@ namespace AGILE2024_BE.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<Guid?>("OrderId")
-                        .HasColumnType("char(36)");
-
                     b.Property<int>("Price")
                         .HasColumnType("int");
 
@@ -1211,8 +1211,6 @@ namespace AGILE2024_BE.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("OrderId");
 
                     b.ToTable("OrderItems");
                 });
@@ -1234,6 +1232,9 @@ namespace AGILE2024_BE.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("char(36)");
+
                     b.Property<int>("Price")
                         .HasColumnType("int");
 
@@ -1241,6 +1242,8 @@ namespace AGILE2024_BE.Migrations
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
 
                     b.HasIndex("ShopCategoryId");
 
@@ -2045,15 +2048,12 @@ namespace AGILE2024_BE.Migrations
                     b.Navigation("Zakaznik");
                 });
 
-            modelBuilder.Entity("AGILE2024_BE.Models.Shop.OrderItem", b =>
+            modelBuilder.Entity("AGILE2024_BE.Models.Shop.Product", b =>
                 {
                     b.HasOne("AGILE2024_BE.Models.Shop.Order", null)
                         .WithMany("Produkty")
                         .HasForeignKey("OrderId");
-                });
 
-            modelBuilder.Entity("AGILE2024_BE.Models.Shop.Product", b =>
-                {
                     b.HasOne("AGILE2024_BE.Models.Shop.ShopCategory", "ShopCategory")
                         .WithMany()
                         .HasForeignKey("ShopCategoryId")

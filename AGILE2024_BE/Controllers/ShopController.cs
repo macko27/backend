@@ -13,6 +13,8 @@ using Azure.Storage.Blobs;
 using AGILE2024_BE.Models.Shop;
 using System.Net.Mail;
 using System.Security.Claims;
+using System.ComponentModel.DataAnnotations.Schema;
+using Azure.Core;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -296,8 +298,147 @@ namespace AGILE2024_BE.Controllers
 
             return Ok(new { id = category.Id, name = category.Name });
         }
+
+
+
+        //*****************************************************
+        // Vytvorenie objednavky
+        //*****************************************************
+        [HttpPost("CreateOrder")]
+        public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request)
+        {
+            var zakaznik = await dbContext.EmployeeCards
+               .Include(e => e.Department)
+               .FirstOrDefaultAsync(e => e.Id == request.Zakaznik);
+
+            if (zakaznik == null)
+                return BadRequest("EmployeeCard neexistuje.");
+
+
+            var productIds = request.Produkty.Select(p => p.ProductId).ToList();
+
+            var products = await dbContext.Products
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+
+            if (products.Count != request.Produkty.Count)
+                return BadRequest("Niektoré produkty neexistujú");
+
+            //vytvorenie položiek objednávky
+            var orderItems = new List<OrderItem>();
+            int totalPoints = 0;
+
+            foreach (var item in request.Produkty)
+            {
+                var product = products.First(p => p.Id == item.ProductId);
+
+                orderItems.Add(new OrderItem
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    Quantity = item.Mnozstvo,
+                    Price = product.Price // snapshot ceny
+                });
+
+                totalPoints += product.Price * item.Mnozstvo;
+            }
+
+            //kontrola bodov
+            if (zakaznik.PointsBalance < totalPoints)
+                return BadRequest("Nedostatok bodov");
+
+
+            var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                CisloObjednavky = orderNumber,
+                Ulica = request.Ulica,
+                CisloDomu = request.CisloDomu,
+                City = request.City,
+                PSC = request.PSC,
+                Telefon = request.Telefon,
+                Poznamka = request.Poznamka,
+                Zakaznik = zakaznik,
+                Produkty = orderItems,
+                Cena = totalPoints
+            };
+
+            //odpocitanie bodov a pridanie do historie
+            zakaznik.PointsBalance -= totalPoints;
+
+            dbContext.PointsTransactions.Add(new PointsTransaction
+            {
+                Id = Guid.NewGuid(),
+                EmployeeCardId = zakaznik.Id,
+                Points = totalPoints,
+                Type = "Nákup",
+                Description = $"Objednávka: {orderNumber}",
+                CreatedAt = DateTime.UtcNow,
+                RecognitionId = order.Id
+            });
+
+            dbContext.Orders.Add(order);
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new { orderId = order.Id, orderNumber });
+        }
+
+
+
+        //******************************
+        // Získanie objednavok
+        //******************************
+        [HttpGet("GetMyOrders/{id}")]
+        public async Task<IActionResult> GetMyOrders(Guid id)
+        {
+            var orders = await dbContext.Orders
+                .Where(o => o.Zakaznik.Id == id)
+                .OrderByDescending(o => o.DateIn)
+                .Select(o => new OrderRequest
+                {
+                    Id = o.Id,
+                    CisloObjednavky = o.CisloObjednavky,
+                    Ulica = o.Ulica,
+                    CisloDomu = o.CisloDomu,
+                    City = o.City,
+                    PSC = o.PSC,
+                    Telefon = o.Telefon,
+                    Poznamka = o.Poznamka,
+                    Cena = o.Cena,
+                    DateIn = o.DateIn,
+                    Stav = o.Stav,
+
+                    Produkty = o.Produkty.Select(p => new Product
+                    {
+                        Id = p.ProductId,
+                        Price = p.Price
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(orders);
+        }
+
     }
 
+
+    public class OrderRequest
+    {
+        public Guid Id { get; set; }
+        public string CisloObjednavky { get; set; } = default!;
+        public required string Ulica { get; set; }
+        public required int CisloDomu { get; set; }
+        public required string City { get; set; }
+        public required string PSC { get; set; }
+        public required string Telefon { get; set; }
+        public string? Poznamka { get; set; }
+        public int Cena { get; set; }
+        public ICollection<Product>? Produkty { get; set; } = new List<Product>();
+        public DateTime DateIn { get; set; } = DateTime.UtcNow;
+        public EnumOrderState Stav { get; set; } = EnumOrderState.Vytvorena;
+    }
 
     public class ProductWithFileRequest
     {
@@ -312,6 +453,25 @@ namespace AGILE2024_BE.Controllers
     public class CreateCategoryRequest
     {
         public string Name { get; set; }
+    }
+
+    public class CreateOrderRequest
+    {
+        public Guid Zakaznik { get; set; }
+        public string Ulica { get; set; } = default!;
+        public int CisloDomu { get; set; }
+        public string City { get; set; } = default!;
+        public string PSC { get; set; } = default!;
+        public string Telefon { get; set; } = default!;
+        public string? Poznamka { get; set; }
+
+        public List<OrderItemRequest> Produkty { get; set; } = new();
+    }
+
+    public class OrderItemRequest
+    {
+        public Guid ProductId { get; set; }
+        public int Mnozstvo { get; set; }
     }
 
 }
