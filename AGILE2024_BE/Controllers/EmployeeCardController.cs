@@ -330,7 +330,21 @@ namespace AGILE2024_BE.Controllers
       [HttpGet("GetEmployeeCardLoggedIn")]
         public async Task<IActionResult> GetEmployeeCardLoggedIn()
         {
-            ExtendedIdentityUser? user = await userManager.FindByEmailAsync(User.Identity?.Name!);
+            //ExtendedIdentityUser? user = await userManager.FindByEmailAsync(User.Identity?.Name!);
+
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var user = await userManager.FindByIdAsync(userId);
+
+            if (user == null)
+            {
+                return Unauthorized();
+            }
 
             var loggedEmployee = await dbContext.EmployeeCards
                 .Include(ec => ec.User)
