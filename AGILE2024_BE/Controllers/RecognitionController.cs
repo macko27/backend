@@ -358,7 +358,8 @@ namespace AGILE2024_BE.Controllers
                                 Type = "Uznanie",
                                 Description = $"{recognition.Predmet}",
                                 CreatedAt = DateTime.UtcNow,
-                                RecognitionId = recognition.Id
+                                RecognitionId = recognition.Id,
+                                IsPositive = true
                             });
                         }
                     }
@@ -873,7 +874,8 @@ namespace AGILE2024_BE.Controllers
                         Type = "Uznanie",
                         Description = $"{recipientRecord.Recognition.Predmet}",
                         CreatedAt = DateTime.UtcNow,
-                        RecognitionId = recipientRecord.Recognition.Id
+                        RecognitionId = recipientRecord.Recognition.Id,
+                        IsPositive = true
                     });
                 }
 
@@ -900,7 +902,8 @@ namespace AGILE2024_BE.Controllers
                     points = p.Points,
                     type = p.Type,
                     description = p.Description,
-                    recognitionId = p.RecognitionId
+                    recognitionId = p.RecognitionId,
+                    isPositive = p.IsPositive
                 })
                 .ToListAsync();
 

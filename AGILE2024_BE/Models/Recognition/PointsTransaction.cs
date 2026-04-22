@@ -16,5 +16,6 @@
         public DateTime CreatedAt { get; set; }
 
         public Guid? RecognitionId { get; set; }
+        public bool IsPositive { get; set; } = true;
     }
 }

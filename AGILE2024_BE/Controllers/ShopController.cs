@@ -376,7 +376,8 @@ namespace AGILE2024_BE.Controllers
                 Type = "Nákup",
                 Description = $"Objednávka: {orderNumber}",
                 CreatedAt = DateTime.UtcNow,
-                RecognitionId = order.Id
+                RecognitionId = order.Id,
+                IsPositive = false
             });
 
             dbContext.Orders.Add(order);
@@ -409,11 +410,15 @@ namespace AGILE2024_BE.Controllers
                     Cena = o.Cena,
                     DateIn = o.DateIn,
                     Stav = o.Stav,
-
-                    Produkty = o.Produkty.Select(p => new Product
+                    Pouzivatel = "",
+                    Produkty = o.Produkty.Select(p => new ProductDto
                     {
-                        Id = p.ProductId,
-                        Price = p.Price
+                        Id = p.Product.Id,
+                        Name = p.Product.Name,
+                        Info = p.Product.Info,
+                        Price = p.Price,
+                        Quantity = p.Quantity,
+                        ImageUrl = p.Product.ProductAttachment != null ? p.Product.ProductAttachment.FileUrl : null
                     }).ToList()
                 })
                 .ToListAsync();
@@ -421,23 +426,139 @@ namespace AGILE2024_BE.Controllers
             return Ok(orders);
         }
 
+
+
+
+        //******************************
+        // Získanie vsetkych objednavok
+        //******************************
+        [HttpGet("GetAllOrders")]
+        [Authorize(Roles = RolesDef.ShopAdmin)]
+        public async Task<IActionResult> GetAllOrders(Guid id)
+        {
+            var orders = await dbContext.Orders
+                .OrderByDescending(o => o.DateIn)
+                .Select(o => new OrderRequest
+                {
+                    Id = o.Id,
+                    CisloObjednavky = o.CisloObjednavky,
+                    Ulica = o.Ulica,
+                    CisloDomu = o.CisloDomu,
+                    City = o.City,
+                    PSC = o.PSC,
+                    Telefon = o.Telefon,
+                    Poznamka = o.Poznamka,
+                    Cena = o.Cena,
+                    DateIn = o.DateIn,
+                    Stav = o.Stav,
+                    Pouzivatel = o.Zakaznik.User.Name + " " + o.Zakaznik.User.Surname,
+                    Produkty = o.Produkty.Select(p => new ProductDto
+                    {
+                        Id = p.Product.Id,
+                        Name = p.Product.Name,
+                        Info = p.Product.Info,
+                        Price = p.Price,
+                        Quantity = p.Quantity,
+                        ImageUrl = p.Product.ProductAttachment != null ? p.Product.ProductAttachment.FileUrl : null
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(orders);
+        }
+
+
+
+        //*****************************************************
+        // Update stavu objednavky
+        //*****************************************************
+        [HttpPut("UpdateOrderStatus/{id}")]
+        [Authorize(Roles = RolesDef.ShopAdmin)]
+        public async Task<IActionResult> UpdateOrderStatus(Guid id, [FromBody] UpdateOrderStatusRequest request)
+        {
+            var order = await dbContext.Orders
+                .Include(o => o.Zakaznik)
+                .FirstOrDefaultAsync(o => o.Id == id);
+
+            if (order == null)
+                return NotFound("Objednávka neexistuje");
+
+            //zmena stavu
+            order.Stav = request.Stav;
+
+            //zaznam do historie bodov
+            if (order.Stav == EnumOrderState.Zrusena)
+            {
+                var zakaznik = await dbContext.EmployeeCards.FirstOrDefaultAsync(z => z.Id == order.Zakaznik.Id);
+                if (zakaznik == null)
+                    return NotFound("Zákazník neexistuje");
+
+                zakaznik.PointsBalance += order.Cena;
+
+                dbContext.PointsTransactions.Add(new PointsTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    EmployeeCardId = order.Zakaznik.Id,
+                    Points = order.Cena,
+                    Type = "Refundácia",
+                    Description = $"Refundácia objednávky: {order.CisloObjednavky}",
+                    CreatedAt = DateTime.UtcNow,
+                    RecognitionId = order.Id,
+                    IsPositive = true
+                });
+            }
+            
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new
+            {
+                id = order.Id,
+                stav = order.Stav
+            });
+        }
+
+    }
+
+
+    public class UpdateOrderStatusRequest
+    {
+        public EnumOrderState Stav { get; set; }
+    }
+
+    public class ProductAttachmentDto
+    {
+        public string FileName { get; set; }
+        public string FileUrl { get; set; }
+    }
+
+
+    public class ProductDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Info { get; set; }
+        public int Price { get; set; }
+        public string ImageUrl { get; set; }
+        public int Quantity { get; set; }
     }
 
 
     public class OrderRequest
     {
         public Guid Id { get; set; }
-        public string CisloObjednavky { get; set; } = default!;
-        public required string Ulica { get; set; }
-        public required int CisloDomu { get; set; }
-        public required string City { get; set; }
-        public required string PSC { get; set; }
-        public required string Telefon { get; set; }
+        public string CisloObjednavky { get; set; }
+        public string Ulica { get; set; }
+        public int CisloDomu { get; set; }
+        public string City { get; set; }
+        public string PSC { get; set; }
+        public string Telefon { get; set; }
         public string? Poznamka { get; set; }
         public int Cena { get; set; }
-        public ICollection<Product>? Produkty { get; set; } = new List<Product>();
-        public DateTime DateIn { get; set; } = DateTime.UtcNow;
-        public EnumOrderState Stav { get; set; } = EnumOrderState.Vytvorena;
+        public DateTime DateIn { get; set; }
+        public EnumOrderState Stav { get; set; }
+        public string? Pouzivatel { get; set; }
+
+        public ICollection<ProductDto> Produkty { get; set; } = new List<ProductDto>();
     }
 
     public class ProductWithFileRequest

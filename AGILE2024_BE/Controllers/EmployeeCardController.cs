@@ -80,7 +80,8 @@ namespace AGILE2024_BE.Controllers
                     Points = rozdiel,
                     Type = "ADJUSTMENT",
                     Description = $"Manuálna úprava bodov adminom ({oldPoints} → {newPoints})",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    IsPositive = rozdiel > 0
                 });
             }
 
