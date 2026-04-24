@@ -410,7 +410,7 @@ namespace AGILE2024_BE.Controllers
                     Cena = o.Cena,
                     DateIn = o.DateIn,
                     Stav = o.Stav,
-                    Pouzivatel = "",
+                    Pouzivatel = o.Zakaznik.User.Name + " " + o.Zakaznik.User.Surname,
                     Produkty = o.Produkty.Select(p => new ProductDto
                     {
                         Id = p.Product.Id,
@@ -424,6 +424,45 @@ namespace AGILE2024_BE.Controllers
                 .ToListAsync();
 
             return Ok(orders);
+        }
+
+
+
+        //******************************
+        // Získanie objednavky
+        //******************************
+        [HttpGet("GetOrder/{id}")]
+        public async Task<IActionResult> GetOrder(Guid id)
+        {
+            var order = await dbContext.Orders
+                .Where(o => o.Id == id)
+                .OrderByDescending(o => o.DateIn)
+                .Select(o => new OrderRequest
+                {
+                    Id = o.Id,
+                    CisloObjednavky = o.CisloObjednavky,
+                    Ulica = o.Ulica,
+                    CisloDomu = o.CisloDomu,
+                    City = o.City,
+                    PSC = o.PSC,
+                    Telefon = o.Telefon,
+                    Poznamka = o.Poznamka,
+                    Cena = o.Cena,
+                    DateIn = o.DateIn,
+                    Stav = o.Stav,
+                    Pouzivatel = o.Zakaznik.User.Name + " " + o.Zakaznik.User.Surname,
+                    Produkty = o.Produkty.Select(p => new ProductDto
+                    {
+                        Id = p.Product.Id,
+                        Name = p.Product.Name,
+                        Info = p.Product.Info,
+                        Price = p.Price,
+                        Quantity = p.Quantity,
+                        ImageUrl = p.Product.ProductAttachment != null ? p.Product.ProductAttachment.FileUrl : null
+                    }).ToList()
+                }).FirstOrDefaultAsync();
+
+            return Ok(order);
         }
 
 
