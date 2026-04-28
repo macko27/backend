@@ -556,6 +556,58 @@ namespace AGILE2024_BE.Controllers
             });
         }
 
+
+
+        //*****************************************************
+        // Update stavu objednavky
+        //*****************************************************
+        [HttpPut("CancelOrder/{id}")]
+        public async Task<IActionResult> CancelOrder(Guid id)
+        {
+            var order = await dbContext.Orders
+                .Include(o => o.Zakaznik)
+                .FirstOrDefaultAsync(o => o.Id == id);
+
+            if (order == null)
+                return NotFound("Objednávka neexistuje");
+
+            if (order.Stav != EnumOrderState.Vytvorena)
+                return BadRequest("Objednávka musí byt v stave vytvorena!");
+
+            //zmena stavu
+            order.Stav = EnumOrderState.Zrusena;
+
+            //zaznam do historie bodov
+            if (order.Stav == EnumOrderState.Zrusena)
+            {
+                var zakaznik = await dbContext.EmployeeCards.FirstOrDefaultAsync(z => z.Id == order.Zakaznik.Id);
+                if (zakaznik == null)
+                    return NotFound("Zákazník neexistuje");
+
+                zakaznik.PointsBalance += order.Cena;
+
+                dbContext.PointsTransactions.Add(new PointsTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    EmployeeCardId = order.Zakaznik.Id,
+                    Points = order.Cena,
+                    Type = "Refundácia",
+                    Description = $"Refundácia objednávky: {order.CisloObjednavky}",
+                    CreatedAt = DateTime.UtcNow,
+                    RecognitionId = order.Id,
+                    IsPositive = true
+                });
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new
+            {
+                id = order.Id,
+                stav = order.Stav
+            });
+        }
+
     }
 
 
