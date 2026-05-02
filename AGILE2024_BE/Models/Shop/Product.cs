@@ -12,5 +12,6 @@ namespace AGILE2024_BE.Models.Shop
         public ShopCategory ShopCategory { get; set; }
         public ProductAttachment ProductAttachment { get; set; }
         public bool AnoPlatny { get; set; } = true;
+        public int Size { get; set; }
     }
 }

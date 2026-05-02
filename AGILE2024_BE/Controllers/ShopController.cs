@@ -15,6 +15,8 @@ using System.Net.Mail;
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations.Schema;
 using Azure.Core;
+using AGILE2024_BE.Models.Survey;
+using AGILE2024_BE.Migrations;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -73,6 +75,7 @@ namespace AGILE2024_BE.Controllers
             product.Name = data.name;
             product.Info = data.info;
             product.Price = data.price;
+            product.Size = data.size;
             product.ShopCategory = await dbContext.ShopCategories.FirstOrDefaultAsync(c => c.Id == data.shopCategoryId);
             product.AnoPlatny = true;
 
@@ -117,13 +120,36 @@ namespace AGILE2024_BE.Controllers
         // Získanie všetkých produktov
         //******************************
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAllProducts(int page = 0, int size = 12)
+        public async Task<IActionResult> GetAllProducts(int page = 0, int size = 12, string? name = null, string? categoryId = null, int? priceFrom = null, int? priceTo = null)
         {
             var query = dbContext.Products
                 .Include(p => p.ShopCategory)
                 .Include(p => p.ProductAttachment)
                 .Where(p => p.AnoPlatny == true)
                 .AsQueryable();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                query = query.Where(p => EF.Functions.Like(p.Name, $"%{name}%"));
+            }
+
+            Guid? categoryGuid = string.IsNullOrEmpty(categoryId) ? null : Guid.Parse(categoryId);
+            if (categoryGuid.HasValue)
+            {
+                query = query.Where(p => p.ShopCategory.Id == categoryGuid);
+            }
+
+            // filtrovanie podľa minimálnej ceny
+            if (priceFrom.HasValue)
+            {
+                query = query.Where(p => p.Price >= priceFrom.Value);
+            }
+
+            // filtrovanie podľa maximálnej ceny
+            if (priceTo.HasValue)
+            {
+                query = query.Where(p => p.Price <= priceTo.Value);
+            }
 
             var products = await query
                 .Skip(page * size)
@@ -134,6 +160,7 @@ namespace AGILE2024_BE.Controllers
                     name = p.Name,
                     info = p.Info,
                     price = p.Price,
+                    size = p.Size,
                     shopCategory = new
                     {
                         id = p.ShopCategory.Id,
@@ -169,6 +196,7 @@ namespace AGILE2024_BE.Controllers
                     name = p.Name,
                     info = p.Info,
                     price = p.Price,
+                    size = p.Size,
                     shopCategory = new
                     {
                         id = p.ShopCategory.Id,
@@ -214,7 +242,7 @@ namespace AGILE2024_BE.Controllers
 
 
         //******************************
-        // Získanie všetkých produktov
+        // Získanie všetkých kategorii
         //******************************
         [HttpGet("GetAllCategories")]
         public async Task<IActionResult> GetAllCategories()
@@ -229,6 +257,7 @@ namespace AGILE2024_BE.Controllers
 
             return Ok(shopCategories);
         }
+
 
 
         //*****************************************************
@@ -309,6 +338,7 @@ namespace AGILE2024_BE.Controllers
         {
             var zakaznik = await dbContext.EmployeeCards
                .Include(e => e.Department)
+               .Include(e => e.User)
                .FirstOrDefaultAsync(e => e.Id == request.Zakaznik);
 
             if (zakaznik == null)
@@ -331,6 +361,15 @@ namespace AGILE2024_BE.Controllers
             foreach (var item in request.Produkty)
             {
                 var product = products.First(p => p.Id == item.ProductId);
+
+                // kontrola skladu
+                if (product.Size < item.Mnozstvo)
+                {
+                    return BadRequest($"Produkt {product.Name} nemá dostatok kusov na sklade");
+                }
+
+                // odpočítanie skladu
+                product.Size -= item.Mnozstvo;
 
                 orderItems.Add(new OrderItem
                 {
@@ -379,6 +418,20 @@ namespace AGILE2024_BE.Controllers
                 RecognitionId = order.Id,
                 IsPositive = false
             });
+
+            //notifikacia
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false,
+                NotificationType = EnumNotificationType.OrderCreated,
+                ReferencedItemId = order.Id,
+                Message = $"Objednávka číslo: {order.CisloObjednavky} bola úspešne vytvorená.",
+                User = zakaznik.User
+            };
+
+            dbContext.Notifications.Add(notification);
 
             dbContext.Orders.Add(order);
             await dbContext.SaveChangesAsync();
@@ -517,18 +570,24 @@ namespace AGILE2024_BE.Controllers
         {
             var order = await dbContext.Orders
                 .Include(o => o.Zakaznik)
+                    .ThenInclude(z => z.User)
+                .Include(o => o.Produkty)
+                    .ThenInclude(p => p.Product)
                 .FirstOrDefaultAsync(o => o.Id == id);
 
             if (order == null)
                 return NotFound("Objednávka neexistuje");
 
+            var previousState = order.Stav;
             //zmena stavu
             order.Stav = request.Stav;
 
             //zaznam do historie bodov
-            if (order.Stav == EnumOrderState.Zrusena)
+            if (previousState != EnumOrderState.Zrusena && request.Stav == EnumOrderState.Zrusena)
             {
+
                 var zakaznik = await dbContext.EmployeeCards.FirstOrDefaultAsync(z => z.Id == order.Zakaznik.Id);
+
                 if (zakaznik == null)
                     return NotFound("Zákazník neexistuje");
 
@@ -545,7 +604,17 @@ namespace AGILE2024_BE.Controllers
                     RecognitionId = order.Id,
                     IsPositive = true
                 });
+
+                foreach (var item in order.Produkty)
+                {
+                    if (item.Product != null)
+                    {
+                        item.Product.Size += item.Quantity;
+                    }
+                }
             }
+
+            await UpdateOrderStatusSendNotification(order);
             
             await dbContext.SaveChangesAsync();
 
@@ -554,6 +623,48 @@ namespace AGILE2024_BE.Controllers
                 id = order.Id,
                 stav = order.Stav
             });
+        }
+
+
+        //*****************************************************
+        // Pridanie notifikacie k zmene stavu objednavky
+        //*****************************************************
+        private async Task UpdateOrderStatusSendNotification(Order order)
+        {
+
+            EnumOrderState state = order.Stav;
+            string message = state switch
+            {
+                EnumOrderState.Potvrdena => $"Objednávka číslo: {order.CisloObjednavky} bola potvrdená.",
+                EnumOrderState.Odoslana => $"Objednávka číslo: {order.CisloObjednavky} bola odoslaná.",
+                EnumOrderState.Dorucena => $"Objednávka číslo: {order.CisloObjednavky} bola doručená.",
+                EnumOrderState.Zrusena => $"Objednávka číslo: {order.CisloObjednavky} bola zrušená.",
+                _ => ""
+            };
+
+            EnumNotificationType notificationType = state switch
+            {
+                EnumOrderState.Potvrdena => EnumNotificationType.OrderApproved,
+                EnumOrderState.Odoslana => EnumNotificationType.OrderSent,
+                EnumOrderState.Dorucena => EnumNotificationType.OrderRecieved,
+                EnumOrderState.Zrusena => EnumNotificationType.OrderCancelled,
+                _ => EnumNotificationType.OrderCancelled
+            };
+
+
+            //notifikacia
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false,
+                NotificationType = notificationType,
+                ReferencedItemId = order.Id,
+                Message = message,
+                User = order.Zakaznik.User
+            };
+
+            dbContext.Notifications.Add(notification);
         }
 
 
@@ -566,6 +677,9 @@ namespace AGILE2024_BE.Controllers
         {
             var order = await dbContext.Orders
                 .Include(o => o.Zakaznik)
+                    .ThenInclude(o => o.User)
+                .Include(o => o.Produkty)
+                    .ThenInclude(p => p.Product)
                 .FirstOrDefaultAsync(o => o.Id == id);
 
             if (order == null)
@@ -574,16 +688,21 @@ namespace AGILE2024_BE.Controllers
             if (order.Stav != EnumOrderState.Vytvorena)
                 return BadRequest("Objednávka musí byt v stave vytvorena!");
 
+            foreach (var item in order.Produkty)
+            {
+                if (item.Product != null)
+                {
+                    item.Product.Size += item.Quantity;
+                }
+            }
+
             //zmena stavu
             order.Stav = EnumOrderState.Zrusena;
 
             //zaznam do historie bodov
-            if (order.Stav == EnumOrderState.Zrusena)
+            var zakaznik = await dbContext.EmployeeCards.FirstOrDefaultAsync(z => z.Id == order.Zakaznik.Id);
+            if (zakaznik != null)
             {
-                var zakaznik = await dbContext.EmployeeCards.FirstOrDefaultAsync(z => z.Id == order.Zakaznik.Id);
-                if (zakaznik == null)
-                    return NotFound("Zákazník neexistuje");
-
                 zakaznik.PointsBalance += order.Cena;
 
                 dbContext.PointsTransactions.Add(new PointsTransaction
@@ -598,6 +717,9 @@ namespace AGILE2024_BE.Controllers
                     IsPositive = true
                 });
             }
+
+
+            await UpdateOrderStatusSendNotification(order);
 
             await dbContext.SaveChangesAsync();
 
@@ -631,6 +753,7 @@ namespace AGILE2024_BE.Controllers
         public int Price { get; set; }
         public string ImageUrl { get; set; }
         public int Quantity { get; set; }
+        public int Size { get; set; }
     }
 
 
@@ -660,6 +783,7 @@ namespace AGILE2024_BE.Controllers
         public int price { get; set; }
         public Guid shopCategoryId { get; set; }
         public IFormFile? file { get; set; }
+        public int size { get; set; }
     }
 
     public class CreateCategoryRequest

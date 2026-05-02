@@ -13,6 +13,11 @@
         SurveyCompletedNotificationType,
         SurveyExpiredNotificationType,
         RecognitionCreated,
-        RecognitionApproval
+        RecognitionApproval,
+        OrderCreated,
+        OrderApproved,
+        OrderSent,
+        OrderRecieved,
+        OrderCancelled
     }
 }
