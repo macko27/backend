@@ -278,7 +278,7 @@ namespace AGILE2024_BE.Controllers
             }
 
             var employeesInSameDepartment = employeeCards
-                .Where(ec => ec.Department.Id == userDepartmentId && employeesZamestnanec.Contains(ec.User))
+                .Where(ec => ec.Department != null && ec.Department.Id == userDepartmentId && employeesZamestnanec.Contains(ec.User))
                 //.Where(ec => ec.Department.Id == userDepartmentId && allEmployees.Contains(ec.User))
                 .Select(ec => new EmployeeCardResponse
                 {
