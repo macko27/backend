@@ -193,6 +193,44 @@ namespace AGILE2024_BE.Controllers
             return Ok(employeeCard);
         }
 
+
+
+        [HttpGet("GetAllEmployeesExceptMe")]
+        public async Task<IActionResult> GetAllEmployeesExceptMe()
+        {
+            var userId = this.userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var employeesZamestnanec = await userManager.GetUsersInRoleAsync(RolesDef.Zamestnanec);
+            var employeesVeduci = await userManager.GetUsersInRoleAsync(RolesDef.Veduci);
+
+            var employees = employeesZamestnanec
+                .Concat(employeesVeduci)
+                .Where(u => u.Id != userId)
+                .ToList();
+
+            var employeeCards = await dbContext.EmployeeCards
+                .Include(ec => ec.User)
+                .Where(ec => employees.Select(e => e.Id).Contains(ec.User.Id))
+                .Select(ec => new EmployeeCardResponse
+                {
+                    EmployeeId = ec.Id,
+                    Email = ec.User.Email,
+                    Name = ec.User.Name ?? string.Empty,
+                    TitleBefore = ec.User.Title_before ?? string.Empty,
+                    TitleAfter = ec.User.Title_after ?? string.Empty,
+                    Department = ec.Department.Name ?? "N/A",
+                    Surname = ec.User.Surname ?? string.Empty,
+                    MiddleName = ec.User.MiddleName
+                })
+                .ToListAsync();
+
+            return Ok(employeeCards);
+        }
+
+
+
         [HttpGet("GetAllEmployees")]
         public async Task<IActionResult> GetAllEmployees()
         {
