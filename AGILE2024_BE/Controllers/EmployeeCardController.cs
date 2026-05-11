@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Reflection.Emit;
 using AGILE2024_BE.Models.Recognition;
+using System.Globalization;
 
 namespace AGILE2024_BE.Controllers
 {
@@ -55,13 +56,21 @@ namespace AGILE2024_BE.Controllers
             var department = await dbContext.Departments.FindAsync(employeeCardRequest.Department);
             var contractType = await dbContext.ContractTypes.FindAsync(employeeCardRequest.ContractType);
 
-            employeeCard.Birthdate = DateTime.Parse(employeeCardRequest.Birth);
+            employeeCard.Birthdate = DateTime.ParseExact(
+                employeeCardRequest.Birth,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture
+            );
             employeeCard.ContractType = contractType;
             employeeCard.Location = location;
             employeeCard.Department = department;
             employeeCard.WorkPercentage = employeeCardRequest.WorkTime;
             employeeCard.Level = level;
-            employeeCard.StartWorkDate = DateTime.Parse(employeeCardRequest.StartWorkDate);
+            employeeCard.StartWorkDate = DateTime.ParseExact(
+                employeeCardRequest.StartWorkDate,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture
+            );
             employeeCard.LastEdited = DateTime.Now;
 
             var oldPoints = employeeCard.PointsBalance;
